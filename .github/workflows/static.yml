@@ -1,43 +1,54 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+
+name: Create ServiceNow Change on Push
 
 on:
-  # Runs on pushes targeting the default branch
   push:
-    branches: ["main"]
-
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
-# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
+    branches:
+      - main
+      # add more branches if needed
+      # - develop
 
 jobs:
-  # Single deploy job since we're just deploying
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  create-change:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+
+      # Optional: run build/test first, or use your existing build job and set `needs: build`
+      # - name: Setup Node
+      #   uses: actions/setup-node@v4
+      #   with:
+      #     node-version: '18.x'
+      # - name: Install & Test
+      #   run: |
+      #     npm ci
+      #     npm test
+
+      # 👉 Use ServiceNow DevOps Action (token-based, available from v2.0+ on instance)
+      - name: ServiceNow Create Change
+        id: create_change
+        uses: ServiceNow/servicenow-devops-change@v3.1.0
         with:
-          # Upload entire repository
-          path: '.'
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+
+          # Change Request payload (adjust to your DCV policy requirements)
+          change-request: >-
+            {
+              "category": "Normal",
+              "short_description": "Auto change for push on ${ GITHUB_REF_NAME }",
+              "description": "Repository: ${ GITHUB_REPOSITORY }, Commit: ${ GITHUB_SHA }, Actor: ${ GITHUB_ACTOR }",
+              "implementation_plan": "Deploy via pipeline after approvals",
+              "backout_plan": "Rollback to last stable release",
+              "test_plan": "Unit/Integration tests executed in CI",
+              "risk": "Low",
+              "assignment_group": ""
+            }
+
+      - name: Output created change
+        run: |
+          echo "Change Number: ${{ steps.create_change.outputs.change-request-number }}"
