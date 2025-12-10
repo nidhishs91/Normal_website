@@ -5,8 +5,6 @@ on:
   push:
     branches:
       - main
-      # add more branches if needed
-      # - develop
 
 jobs:
   create-change:
@@ -16,27 +14,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Optional: run build/test first, or use your existing build job and set `needs: build`
-      # - name: Setup Node
-      #   uses: actions/setup-node@v4
-      #   with:
-      #     node-version: '18.x'
-      # - name: Install & Test
-      #   run: |
-      #     npm ci
-      #     npm test
-
-      # 👉 Use ServiceNow DevOps Action (token-based, available from v2.0+ on instance)
       - name: ServiceNow Create Change
         id: create_change
         uses: ServiceNow/servicenow-devops-change@v3.1.0
         with:
+          # --- Auth & Tool mapping ---
           devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+
+          # --- CI/CD context required by the action ---
+          # These three are typically mandatory for DCV mapping
+          pipeline-name: "${{ github.repository }}"           # e.g., org/repo
+          stage-name: "Create Change"                         # any friendly stage label
+          job-name: "ServiceNow Create Change"                # must be provided (your error)
+
+          # Full GitHub event context (helps the action enrich the record)
           context-github: ${{ toJSON(github) }}
 
-          # Change Request payload (adjust to your DCV policy requirements)
+          # --- Change Request payload (adapt to your DCV policy) ---
           change-request: >-
             {
               "category": "Normal",
@@ -45,10 +41,10 @@ jobs:
               "implementation_plan": "Deploy via pipeline after approvals",
               "backout_plan": "Rollback to last stable release",
               "test_plan": "Unit/Integration tests executed in CI",
-              "risk": "Low",
-              "assignment_group": ""
+              "risk": "Low"
             }
 
       - name: Output created change
         run: |
           echo "Change Number: ${{ steps.create_change.outputs.change-request-number }}"
+          echo "Change Sys ID: ${{ steps.create_change.outputs.change-request-sys-id }}"
