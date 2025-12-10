@@ -1,2 +1,2 @@
 # Normal_website
-This is for Normal_websi
+This is for Normal_webs
