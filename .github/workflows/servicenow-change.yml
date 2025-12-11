@@ -1,0 +1,52 @@
+
+name: CI-CD with ServiceNow Change
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Tests
+        run: echo "Running tests..."
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: ServiceNow Create Change
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        id: create_change
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          job-name: "Deploy"
+          change-request: |
+            {
+              "setCloseCode": "true",
+              "autoCloseChange": true,
+              "attributes": {
+                "short_description": "Automated Deployment",
+                "description": "Deploy from GitHub Actions",
+                "implementation_plan": "Automated deploy within planned window",
+                "backout_plan": "Redeploy previous version",
+                "test_plan": "Post-deploy smoke tests"
+              }
+            }
+
+      - name: ServiceNow Get Change
+        uses: ServiceNow/servicenow-devops-get-change@v3.1.0
+        with:
+          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+          context-github: ${{ toJSON(github) }}
+          change-details: '{"pipeline_name":"CI-CD with ServiceNow Change","stage_name":"Deploy","attempt_number":"1"}'
