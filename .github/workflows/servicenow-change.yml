@@ -35,7 +35,7 @@ jobs:
               "setCloseCode": true,
               "autoCloseChange": true,
               "attributes": {
-                "sys_id": "adffaa9e4370211072b7f6be5bb8f2ed",
+                "model":"DevOps",
                 "short_description": "Automated Deployment",
                 "description": "Create model-based change from GitHub Actions (DevOps model).",
                 "implementation_plan": "Automated deploy within approved window",
