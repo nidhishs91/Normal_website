@@ -1,2 +1,2 @@
 # Normal_website
-This is for Normal 
+This is for Norm
