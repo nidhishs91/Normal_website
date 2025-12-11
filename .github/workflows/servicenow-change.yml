@@ -20,13 +20,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Secrets presence check
-        run: |
-          test -n "${{ secrets.SN_INSTANCE_URL }}" && echo "URL OK" || (echo "URL MISSING" && exit 1)
-          test -n "${{ secrets.SN_DEVOPS_USER }}" && echo "USER OK" || (echo "USER MISSING" && exit 1)
-          test -n "${{ secrets.SN_DEVOPS_PASSWORD }}" && echo "PASSWORD OK" || (echo "PASSWORD MISSING" && exit 1)
-          test -n "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}" && echo "TOOL ID OK" || (echo "TOOL ID MISSING" && exit 1)
-
       - name: ServiceNow Create Change
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         id: create_change
@@ -42,9 +35,9 @@ jobs:
               "setCloseCode": "true",
               "autoCloseChange": true,
               "attributes": {
-                "short_description": "Automated Software Deployment",
-                "description": "Deploy from GitHub Actions",
-                "assignment_group": "a715cd759f2002002920bde8132e7018",
+                "model_sys_id": "adffaa9e4370211072b7f6be5bb8f2ed",   // <-- your change model sys_id
+                "short_description": "Automated Deployment",
+                "description": "Create model-based change from GitHub Actions (DevOps model).",
                 "implementation_plan": "Automated deploy within approved window",
                 "backout_plan": "Redeploy previous version",
                 "test_plan": "Post-deploy smoke tests"
