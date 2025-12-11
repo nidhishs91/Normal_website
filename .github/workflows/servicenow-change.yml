@@ -1,5 +1,5 @@
 
-name: CI-CD with ServiceNow Change
+name: CI-CD with ServiceNow Change (Basic Auth)
 
 on:
   push:
@@ -20,11 +20,19 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Secrets presence check
+        run: |
+          test -n "${{ secrets.SN_INSTANCE_URL }}" && echo "URL OK" || (echo "URL MISSING" && exit 1)
+          test -n "${{ secrets.SN_DEVOPS_USER }}" && echo "USER OK" || (echo "USER MISSING" && exit 1)
+          test -n "${{ secrets.SN_DEVOPS_PASSWORD }}" && echo "PASSWORD OK" || (echo "PASSWORD MISSING" && exit 1)
+          test -n "${{ secrets.SN_ORCHESTRATION_TOOL_ID }}" && echo "TOOL ID OK" || (echo "TOOL ID MISSING" && exit 1)
+
       - name: ServiceNow Create Change
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         id: create_change
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
@@ -34,9 +42,10 @@ jobs:
               "setCloseCode": "true",
               "autoCloseChange": true,
               "attributes": {
-                "short_description": "Automated Deployment",
+                "short_description": "Automated Software Deployment",
                 "description": "Deploy from GitHub Actions",
-                "implementation_plan": "Automated deploy within planned window",
+                "assignment_group": "a715cd759f2002002920bde8132e7018",
+                "implementation_plan": "Automated deploy within approved window",
                 "backout_plan": "Redeploy previous version",
                 "test_plan": "Post-deploy smoke tests"
               }
@@ -44,9 +53,20 @@ jobs:
 
       - name: ServiceNow Get Change
         uses: ServiceNow/servicenow-devops-get-change@v3.1.0
+        id: get_change
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
-          change-details: '{"pipeline_name":"CI-CD with ServiceNow Change","stage_name":"Deploy","attempt_number":"1"}'
+          change-details: |
+            {
+              "pipeline_name": "CI-CD with ServiceNow Change (Basic Auth)",
+              "stage_name": "Deploy",
+              "attempt_number": "1"
+            }
+
+      - name: Output of Change Creation
+        run: |
+          echo "change-request-number = ${{ steps.create_change.outputs.change-request-number }}"
