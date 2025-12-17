@@ -1,4 +1,70 @@
 
+# name: CI-CD with ServiceNow Change (Basic Auth)
+
+# on:
+#   push:
+#     branches: [ "main" ]
+#   workflow_dispatch:
+
+# jobs:
+#   build:
+#     name: Build
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - name: Run Tests
+#         run: echo "Running tests..."
+
+#   deploy:
+#     name: Deploy
+#     needs: build
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: ServiceNow Create Change
+#         uses: ServiceNow/servicenow-devops-change@v6.1.0
+#         id: create_change
+#         with:
+#           devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+#           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+#           instance-url: ${{ secrets.SN_INSTANCE_URL }}
+#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+#           context-github: ${{ toJSON(github) }}
+#           job-name: "Deploy"
+#           change-request: |
+#             {
+#               "setCloseCode": true,
+#               "autoCloseChange": true,
+#               "attributes": {
+#               "devops_change": true,
+#               "category":"DevOps",
+#                 "short_description": "Automated Deployment",
+#                 "description": "Create model-based change from GitHub Actions (DevOps model).",
+#                 "implementation_plan": "Automated deploy within approved window",
+#                 "backout_plan": "Redeploy previous version",
+#                 "test_plan": "Post-deploy smoke tests"
+#               }
+#             }
+
+#       - name: ServiceNow Get Change
+#         uses: ServiceNow/servicenow-devops-get-change@v3.1.0
+#         id: get_change
+#         with:
+#           devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+#           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+#           instance-url: ${{ secrets.SN_INSTANCE_URL }}
+#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+#           context-github: ${{ toJSON(github) }}
+#           change-details: |
+#             {
+#               "pipeline_name": "CI-CD with ServiceNow Change (Basic Auth)",
+#               "stage_name": "Deploy",
+#               "attempt_number": "1"
+#             }
+
+#       - name: Output of Change Creation
+#         run: |
+
+
 name: CI-CD with ServiceNow Change (Basic Auth)
 
 on:
@@ -20,6 +86,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: ServiceNow Create Change
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         id: create_change
@@ -35,15 +103,20 @@ jobs:
               "setCloseCode": true,
               "autoCloseChange": true,
               "attributes": {
-              "devops_change": true,
-              "category":"DevOps",
-                "short_description": "Automated Deployment",
+                "devops_change": true,
+                "category": "DevOps",
+                               "short_description": "Automated Deployment",
                 "description": "Create model-based change from GitHub Actions (DevOps model).",
                 "implementation_plan": "Automated deploy within approved window",
                 "backout_plan": "Redeploy previous version",
                 "test_plan": "Post-deploy smoke tests"
               }
             }
+
+      - name: Output of Change Creation
+        run: |
+          echo 'Outputs from create_change:'
+          echo '${{ toJSON(steps.create_change.outputs) }}'
 
       - name: ServiceNow Get Change
         uses: ServiceNow/servicenow-devops-get-change@v3.1.0
@@ -61,5 +134,9 @@ jobs:
               "attempt_number": "1"
             }
 
-      - name: Output of Change Creation
+      - name: Output of Get Change
         run: |
+          echo 'Outputs from get_change:'
+          echo '${{ toJSON(steps.get_change.outputs) }}'
+
+      - name: Run deployment scripts
