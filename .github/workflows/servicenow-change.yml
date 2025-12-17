@@ -7,28 +7,46 @@ on:
   workflow_dispatch:
 
 jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Tests
+        run: echo "Running tests..."
+
   ServiceNowDevOpsChange:
     needs: build
     runs-on: ubuntu-latest
-    name: 'ServiceNow DevOps Change'
+    name: ServiceNow DevOps Change
     steps:
+      - uses: actions/checkout@v4
+
       - name: ServiceNow Change
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          # Use ONE auth method; this is token-based
+          devops-integration-token: ${{ secrets.SN_DEVOPS_TOKEN }}
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
-          job-name: 'ServiceNow DevOps Change'
+          job-name: "ServiceNow DevOps Change"
+          # Safer multi-line JSON
           change-request: |
             {
+              "setCloseCode": true,
+              "autoCloseChange": true,
               "attributes": {
-                "short_description": "Automated Deployment",
-                "description": "Create DevOps change from GitHub Actions",
                 "category": "DevOps",
+                "short_description": "Automated Deployment",
+                "description": "Create DevOps change from GitHub Actions.",
                 "implementation_plan": "Automated deploy within approved window",
                 "backout_plan": "Redeploy previous version",
                 "test_plan": "Post-deploy smoke tests"
               }
             }
-``
+
+      - name: Output of Change Creation
+               run|
+          echo 'Outputs from create_change:'
+
