@@ -46,7 +46,14 @@ jobs:
               }
             }
 
+          changeCreationTimeOut: 120
+          abortOnChangeCreationFailure: true
+          timeout: 300
+          abortOnChangeStepTimeout: true
+          interval: 500
+
       - name: Output of Change Creation
         run: |
           echo 'Outputs from create_change:'
+          echo '${{ toJSON(steps.create_change.outputs) }}'
 
