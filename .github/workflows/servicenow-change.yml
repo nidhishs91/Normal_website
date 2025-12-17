@@ -23,17 +23,16 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: ServiceNow Change
+        id: create_change
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          # Use ONE auth method; this is token-based
           devops-integration-token: ${{ secrets.SN_DEVOPS_TOKEN }}
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: "ServiceNow DevOps Change"
-          # Safer multi-line JSON
           change-request: |
-            {
+           {
               "setCloseCode": true,
               "autoCloseChange": true,
               "attributes": {
@@ -47,6 +46,6 @@ jobs:
             }
 
       - name: Output of Change Creation
-               run|
+        run: |
           echo 'Outputs from create_change:'
 
