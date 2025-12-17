@@ -1,5 +1,5 @@
 
-name: ServiceNow DevOps Change (Token)
+name: CI-CD with ServiceNow Change (Basic Auth)
 
 on:
   push:
