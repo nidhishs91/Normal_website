@@ -42,7 +42,8 @@ jobs:
                 "description": "Create DevOps change from GitHub Actions.",
                 "implementation_plan": "Automated deploy within approved window",
                 "backout_plan": "Redeploy previous version",
-                "test_plan": "Post-deploy smoke tests"
+                "test_plan": "Post-deploy smoke tests",
+                "assignment_group":"b85d44954a3623120004689b2d5dd60a"
               }
             }
 
