@@ -47,7 +47,7 @@ jobs:
               }
             }
 
-          deployment-gate: '{"environment":"github-pages","jobName":"Deploy"}'
+          # deployment-gate: '{"environment":"github-pages","jobName":"Deploy"}'
   
           changeCreationTimeOut: 120
           abortOnChangeCreationFailure: true
