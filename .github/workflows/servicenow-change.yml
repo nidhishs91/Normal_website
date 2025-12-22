@@ -57,4 +57,14 @@ jobs:
         run: |
           echo 'Outputs from create_change:'
           echo '${{ toJSON(steps.create_change.outputs) }}'
+   
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: ServiceNowDevOpsChange
+    environment: github-pages
+    steps:
+      - name: Run deployment scripts
+        run: echo "Completed Deployment."
+
 
