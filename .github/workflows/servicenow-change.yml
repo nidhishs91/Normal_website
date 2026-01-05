@@ -66,11 +66,12 @@
 #     needs: ServiceNowDevOpsChange
 #     environment: github-pages
 
+
 name: Prod Deploy
 
 on:
   push:
-    branches: [ main ] # adjust as needed
+    branches: [ main ]
 
 permissions:
   contents: read
@@ -84,18 +85,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Optional: your build and unit tests here
       - name: Build
         run: |
           echo "Build the project..."
-          # add your build commands
+          # Add your build commands here
 
-      # Optional: SonarQube analysis (remove if not using)
       - name: SonarQube Scan
         uses: sonarsource/sonarqube-scan-action@v1
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN:    ${{ secrets.SONAR_TOKEN }}
         with:
-          projectKey: "your-project-key"
-          token: ${{ secrets.SONAR_TOKEN }}
+          projectKey: "e7269cc7174de394beaab1a931ad90fdb7408bf0"   # Must be string
+          # args: >
+          #   -Dsonar.sources=.
+          #   -Dsonar.projectName="Your Project Name"
 
   ServiceNowDevOpsChange:
     needs: build
@@ -106,60 +110,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1) Create the Change in ServiceNow mapped to your pipeline + step
       - name: Create ServiceNow DevOps Change
         id: create_change
-        # Use the latest stable version recommended by your instance (example tag below)
         uses: ServiceNow/servicenow-devops-change@v5.1.0
         with:
-          # ---- Basic Auth (username/password) ----
           devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
-
-          # ServiceNow instance URL (https://<instance>.service-now.com)
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
-
-          # DevOps Tool sys_id for your GitHub integration (from DevOps → Integrations → GitHub)
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-
-          # Provide full GitHub context for mapping
           context-github: ${{ toJSON(github) }}
-
-          # Display name shown in DevOps Evidence
           job-name: 'ServiceNow DevOps Change'
 
-          # ---- Optional: pass change attributes inline (uncomment & adjust) ----
-          # change-type: normal
-          # short-description: "Prod Deploy change initiated by GitHub Actions"
-          # assignment-group: "Application Development"
-          # change-model: "Prod Deploy"    # if you use a named model
-          # template: "Your Change Template"
-          # risk: "moderate"
-          # ---------------------------------------------------------------------
-
-      # 2) Wait for approval (enforces Change Receipt behavior)
       - name: Wait for ServiceNow Change Approval
-        # Approval gate action—holds the job until the change is approved
         uses: servicenow/devops-change-approval-action@v1
         with:
-          # ---- Basic Auth (username/password) ----
           devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
-
           instance_url: ${{ secrets.SN_INSTANCE_URL }}
-
-          # Most versions expose `change_id` (sys_id) as an output from the create step.
-          # If your action uses a different output key (e.g., change_sys_id), update accordingly.
           change_id: ${{ steps.create_change.outputs.change_id }}
 
-      # 3) Deploy AFTER approval
       - name: Deploy to Production
         run: |
           echo "Approval received. Running Prod deployment..."
-          # add your deploy commands (kubectl/helm/terraform/jfrog/etc.)
-
-#     steps:
-#       - name: Run deployment scripts
-#         run: echo "Completed Deployment."
-
-
+          # Add your deploy commands here
