@@ -1,72 +1,165 @@
 
-name: ServiceNow DevOps Change
+# name: ServiceNow DevOps Change
+
+# on:
+#   push:
+#     branches: [ "main" ]
+#   workflow_dispatch:
+
+# jobs:
+#   build:
+#     name: Build
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#       - name: Run Tests
+#         run: echo "Running tests..."
+
+#   ServiceNowDevOpsChange:
+#     needs: build
+#     runs-on: ubuntu-latest
+#     name: ServiceNow DevOps Change
+#     steps:
+#       - uses: actions/checkout@v4
+
+#       - name: ServiceNow Change
+#         id: create_change
+#         uses: ServiceNow/servicenow-devops-change@v6.1.0
+#         with:
+#           devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}      
+#           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+#           instance-url: ${{ secrets.SN_INSTANCE_URL }}
+#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+#           context-github: ${{ toJSON(github) }}
+#           job-name: "ServiceNow DevOps Change"
+#           change-request: |
+#            {
+#               "setCloseCode": true,
+#               "autoCloseChange": true,
+#               "attributes": {
+#                 "category": "DevOps",
+#                 "short_description": "Automated Deployment",
+#                 "description": "Create DevOps change from GitHub Actions.",
+#                 "implementation_plan": "Automated deploy within approved window",
+#                 "backout_plan": "Redeploy previous version",
+#                 "test_plan": "Post-deploy smoke tests",
+#                 "assignment_group":"b85d44954a3623120004689b2d5dd60a"
+#               }
+#             }
+
+#           deployment-gate: '{"environment":"github-pages","jobName":"Deploy"}'
+  
+#           changeCreationTimeOut: 120
+#           abortOnChangeCreationFailure: true
+#           timeout: 200
+#           abortOnChangeStepTimeout: true
+#           interval: 500
+
+#       - name: Output of Change Creation
+#         run: |
+#           echo 'Outputs from create_change:'
+#           echo '${{ toJSON(steps.create_change.outputs) }}'
+   
+#   deploy:
+#     name: Deploy
+#     runs-on: ubuntu-latest
+#     needs: ServiceNowDevOpsChange
+#     environment: github-pages
+
+name: Prod Deploy
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [ main ] # adjust as needed
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    name: Build
     runs-on: ubuntu-latest
+    name: Build & Test
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Run Tests
-        run: echo "Running tests..."
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Optional: your build and unit tests here
+      - name: Build
+        run: |
+          echo "Build the project..."
+          # add your build commands
+
+      # Optional: SonarQube analysis (remove if not using)
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@v1
+        with:
+          projectKey: "your-project-key"
+          token: ${{ secrets.SONAR_TOKEN }}
 
   ServiceNowDevOpsChange:
     needs: build
     runs-on: ubuntu-latest
-    name: ServiceNow DevOps Change
-    steps:
-      - uses: actions/checkout@v4
+    name: ServiceNow DevOps Change (Prod Deploy)
 
-      - name: ServiceNow Change
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1) Create the Change in ServiceNow mapped to your pipeline + step
+      - name: Create ServiceNow DevOps Change
         id: create_change
-        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        # Use the latest stable version recommended by your instance (example tag below)
+        uses: ServiceNow/servicenow-devops-change@v5.1.0
         with:
-          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}      
+          # ---- Basic Auth (username/password) ----
+          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+
+          # ServiceNow instance URL (https://<instance>.service-now.com)
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
+
+          # DevOps Tool sys_id for your GitHub integration (from DevOps → Integrations → GitHub)
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+
+          # Provide full GitHub context for mapping
           context-github: ${{ toJSON(github) }}
-          job-name: "ServiceNow DevOps Change"
-          change-request: |
-           {
-              "setCloseCode": true,
-              "autoCloseChange": true,
-              "attributes": {
-                "category": "DevOps",
-                "short_description": "Automated Deployment",
-                "description": "Create DevOps change from GitHub Actions.",
-                "implementation_plan": "Automated deploy within approved window",
-                "backout_plan": "Redeploy previous version",
-                "test_plan": "Post-deploy smoke tests",
-                "assignment_group":"b85d44954a3623120004689b2d5dd60a"
-              }
-            }
 
-          deployment-gate: '{"environment":"github-pages","jobName":"Deploy"}'
-  
-          changeCreationTimeOut: 120
-          abortOnChangeCreationFailure: true
-          timeout: 200
-          abortOnChangeStepTimeout: true
-          interval: 500
+          # Display name shown in DevOps Evidence
+          job-name: 'ServiceNow DevOps Change'
 
-      - name: Output of Change Creation
+          # ---- Optional: pass change attributes inline (uncomment & adjust) ----
+          # change-type: normal
+          # short-description: "Prod Deploy change initiated by GitHub Actions"
+          # assignment-group: "Application Development"
+          # change-model: "Prod Deploy"    # if you use a named model
+          # template: "Your Change Template"
+          # risk: "moderate"
+          # ---------------------------------------------------------------------
+
+      # 2) Wait for approval (enforces Change Receipt behavior)
+      - name: Wait for ServiceNow Change Approval
+        # Approval gate action—holds the job until the change is approved
+        uses: servicenow/devops-change-approval-action@v1
+        with:
+          # ---- Basic Auth (username/password) ----
+          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+
+          instance_url: ${{ secrets.SN_INSTANCE_URL }}
+
+          # Most versions expose `change_id` (sys_id) as an output from the create step.
+          # If your action uses a different output key (e.g., change_sys_id), update accordingly.
+          change_id: ${{ steps.create_change.outputs.change_id }}
+
+      # 3) Deploy AFTER approval
+      - name: Deploy to Production
         run: |
-          echo 'Outputs from create_change:'
-          echo '${{ toJSON(steps.create_change.outputs) }}'
-   
-  deploy:
-    name: Deploy
-    runs-on: ubuntu-latest
-    needs: ServiceNowDevOpsChange
-    environment: github-pages
-    steps:
-      - name: Run deployment scripts
-        run: echo "Completed Deployment."
+          echo "Approval received. Running Prod deployment..."
+          # add your deploy commands (kubectl/helm/terraform/jfrog/etc.)
+
+#     steps:
+#       - name: Run deployment scripts
+#         run: echo "Completed Deployment."
 
 
