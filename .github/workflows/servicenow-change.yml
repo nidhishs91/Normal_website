@@ -96,7 +96,7 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_TOKEN:    ${{ secrets.SONAR_TOKEN }}
         with:
-          projectKey: "e7269cc7174de394beaab1a931ad90fdb7408bf0"   # Must be string
+          projectKey: "nidhishs91"   # Must be string
           # args: >
           #   -Dsonar.sources=.
           #   -Dsonar.projectName="Your Project Name"
