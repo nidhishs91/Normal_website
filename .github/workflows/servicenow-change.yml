@@ -67,6 +67,74 @@
 #     environment: github-pages
 
 
+# name: Prod Deploy
+
+# on:
+#   push:
+#     branches: [ main ]
+
+# permissions:
+#   contents: read
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     name: Build & Test
+
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+
+#       - name: Build
+#         run: |
+#           echo "Build the project..."
+#           # Add your build commands here
+
+#       - name: SonarQube Scan
+#         uses: sonarsource/sonarqube-scan-action@v1
+#         env:
+#           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+#           SONAR_TOKEN:    ${{ secrets.SONAR_TOKEN }}
+#         with:
+#           projectKey: "nidhishs91"   # Must be string
+#           # args: >
+#           #   -Dsonar.sources=.
+#           #   -Dsonar.projectName="Your Project Name"
+
+#   ServiceNowDevOpsChange:
+#     needs: build
+#     runs-on: ubuntu-latest
+#     name: ServiceNow DevOps Change (Prod Deploy)
+
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v4
+
+#       - name: Create ServiceNow DevOps Change
+#         id: create_change
+#         uses: ServiceNow/servicenow-devops-change@v5.1.0
+#         with:
+#           devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
+#           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+#           instance-url: ${{ secrets.SN_INSTANCE_URL }}
+#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+#           context-github: ${{ toJSON(github) }}
+#           job-name: 'ServiceNow DevOps Change'
+
+#       - name: Wait for ServiceNow Change Approval
+#         uses: servicenow/devops-change-approval-action@v1
+#         with:
+#           devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
+#           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+#           instance_url: ${{ secrets.SN_INSTANCE_URL }}
+#           change_id: ${{ steps.create_change.outputs.change_id }}
+
+#       - name: Deploy to Production
+#         run: |
+#           echo "Approval received. Running Prod deployment..."
+#           # Add your deploy commands here
+
+
 name: Prod Deploy
 
 on:
@@ -82,24 +150,28 @@ jobs:
     name: Build & Test
 
     steps:
+      # Pin actions/checkout to a full SHA (example for v4.2.2)
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0  # improves Sonar reporting across commits
 
       - name: Build
         run: |
           echo "Build the project..."
           # Add your build commands here
 
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@v1
+      - name: SonarQube (SonarCloud) Scan
+        # Use the full commit SHA you shared
+        uses: SonarSource/sonarqube-scan-action@fd57fff1b496f53ddb78caf10d3485891e219cb3
         env:
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_TOKEN:    ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # SonarCloud token
         with:
-          projectKey: "nidhishs91"   # Must be string
-          # args: >
-          #   -Dsonar.sources=.
-          #   -Dsonar.projectName="Your Project Name"
+          # Pass org & project key as args for SonarCloud
+          args: >
+            -Dsonar.organization=nidhishs91
+            -Dsonar.projectKey=nidhishs91_Normal_website
+            -Dsonar.sources=.
 
   ServiceNowDevOpsChange:
     needs: build
@@ -108,7 +180,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Create ServiceNow DevOps Change
         id: create_change
@@ -133,3 +205,4 @@ jobs:
         run: |
           echo "Approval received. Running Prod deployment..."
           # Add your deploy commands here
+
