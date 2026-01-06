@@ -206,6 +206,7 @@
 #           # Add your deploy commands here
 
 
+
 name: Prod Deploy
 
 on:
@@ -259,7 +260,7 @@ jobs:
           instance-url: ${{ secrets.SN_INSTANCE_URL }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
-          job-name: 'ServiceNow DevOps Change'
+          job-name: 'ServiceNow DevOps Change (Prod Deploy)'
 
           # Optional: customize change request fields
           change-request: >-
@@ -275,4 +276,3 @@ jobs:
         run: |
           echo "Approval received. Running Prod deployment..."
           # Add your deploy commands here
-
