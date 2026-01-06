@@ -135,6 +135,7 @@
 #           # Add your deploy commands here
 
 
+
 name: Prod Deploy
 
 on:
@@ -150,7 +151,7 @@ jobs:
     name: Build & Test
 
     steps:
-      # Pin actions/checkout to a full SHA (example for v4.2.2)
+      # Pin checkout to a full SHA (example: v4.2.2)
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -162,12 +163,10 @@ jobs:
           # Add your build commands here
 
       - name: SonarQube (SonarCloud) Scan
-        # Use the full commit SHA you shared
-        uses: SonarSource/sonarqube-scan-action@fd57fff1b496f53ddb78caf10d3485891e219cb3
+        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # SonarCloud token
         with:
-          # Pass org & project key as args for SonarCloud
           args: >
             -Dsonar.organization=nidhishs91
             -Dsonar.projectKey=nidhishs91_Normal_website
@@ -205,4 +204,3 @@ jobs:
         run: |
           echo "Approval received. Running Prod deployment..."
           # Add your deploy commands here
-
