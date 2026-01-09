@@ -279,7 +279,6 @@
 
 #Updated with Auto approval conditions
 
-
 name: Prod Deploy
 
 on:
@@ -294,12 +293,16 @@ jobs:
     runs-on: ubuntu-latest
     name: Build & Test
 
+    # >>> Expose the prepared change-request JSON to other jobs
+    outputs:
+      changereq_json: ${{ steps.changereq.outputs.json }}
+
     steps:
-      # Pin checkout to a full SHA
+      # Pin checkout to a full SHA (example: v4.2.2)
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          fetch-depth: 0  # helps Sonar report across commits
+          fetch-depth: 0  # improves Sonar reporting across commits
 
       - name: Build
         run: |
@@ -316,7 +319,7 @@ jobs:
             -Dsonar.projectKey=nidhishs91_Normal_website
             -Dsonar.sources=.
 
-      # ---------- Option 3: fetch coverage ----------
+      # ---------- Option 3: fetch coverage (safe) ----------
       - name: Install jq (for JSON parsing)
         run: |
           sudo apt-get update
@@ -337,13 +340,12 @@ jobs:
             COVERAGE=0
           fi
 
-          # Store for later steps
           echo "CODE_COVERAGE=$COVERAGE" >> $GITHUB_ENV
           echo "Resolved coverage: $COVERAGE"
-      # ----------------------------------------------
+      # -----------------------------------------------------
 
-      # Prepare valid JSON for the change-request (including policy inputs)
-      - name: Prepare change-request JSON
+      # Build valid JSON for change-request and expose as step output
+      - name: Prepare change-request JSON (with policy inputs)
         id: changereq
         run: |
           cat > change_request.json << 'EOF'
@@ -365,7 +367,7 @@ jobs:
           # Inject numeric coverage value safely
           sed -i "s/CODE_COV_PLACEHOLDER/${CODE_COVERAGE}/" change_request.json
 
-          # Output compact, valid JSON for the next step
+          # Output compact, valid JSON for the next job
           echo "json=$(jq -c . change_request.json)" >> $GITHUB_OUTPUT
 
   ServiceNowDevOpsChange:
@@ -387,8 +389,7 @@ jobs:
           context-github: ${{ toJSON(github) }}
           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
 
-          # Pass the prebuilt valid JSON string
-          change-request: ${{ needs.build.outputs.changereq_json || steps.changereq.outputs.json }}
+          change-request: ${{ needs.build.outputs.changereq_json }}
           interval: '30'
           timeout: '3600'
 
@@ -396,3 +397,5 @@ jobs:
         run: |
           echo "Approval received. Running Prod deployment..."
           # Add your deploy commands here
+
+
