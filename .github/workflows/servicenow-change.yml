@@ -279,6 +279,7 @@
 
 #Updated with Auto approval conditions
 
+
 name: Prod Deploy
 
 on:
@@ -314,8 +315,8 @@ jobs:
             -Dsonar.projectKey=nidhishs91_Normal_website
             -Dsonar.sources=.
 
-      # ---------- Option 3: read coverage ----------
-      - name: Install jq (for JSON parsing)
+      # Read coverage from SonarCloud API and store in env
+      - name: Install jq
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
@@ -333,7 +334,6 @@ jobs:
           fi
           echo "CODE_COVERAGE=$COVERAGE" >> $GITHUB_ENV
           echo "Resolved coverage: $COVERAGE"
-      # ---------------------------------------------
 
   ServiceNowDevOpsChange:
     needs: build
@@ -354,17 +354,18 @@ jobs:
           context-github: ${{ toJSON(github) }}
           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
 
+          # IMPORTANT: use valid JSON and ${{ }} expressions
           change-request: >-
             {
-              "setCloseCode":"true",
-              "autoCloseChange":true,
-              "attributes":{
-                "short_description":"Prod deploy",
-                "description":"Automated deployment via GitHub Actions"
+              "setCloseCode": "true",
+              "autoCloseChange": true,
+              "attributes": {
+                "short_description": "Prod deploy",
+                "description": "Automated deployment via GitHub Actions"
               },
-              "policy_inputs":{
+              "policy_inputs": {
                 "commits_without_work_item": 0,
-                "code_coverage": ${CODE_COVERAGE},
+                "code_coverage": ${{ env.CODE_COVERAGE }},
                 "is_change_with_partial_data": false
               }
             }
