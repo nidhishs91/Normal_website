@@ -207,78 +207,6 @@
 
 
 #Working YAML
-# name: Prod Deploy
-
-# on:
-#   push:
-#     branches: [ main ]
-
-# permissions:
-#   contents: read
-
-# jobs:
-#   build:
-#     runs-on: ubuntu-latest
-#     name: Build & Test
-
-#     steps:
-#       # Pin checkout to a full SHA (example: v4.2.2)
-#       - name: Checkout
-#         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-#         with:
-#           fetch-depth: 0  # improves Sonar reporting across commits
-
-#       - name: Build
-#         run: |
-#           echo "Build the project..."
-#           # Add your build commands here
-
-#       - name: SonarQube (SonarCloud) Scan
-#         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
-#         env:
-#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # SonarCloud token
-#         with:
-#           args: >
-#             -Dsonar.organization=nidhishs91
-#             -Dsonar.projectKey=nidhishs91_Normal_website
-#             -Dsonar.sources=.
-
-#   ServiceNowDevOpsChange:
-#     needs: build
-#     runs-on: ubuntu-latest
-#     name: ServiceNow DevOps Change (Prod Deploy)
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-#       - name: Create ServiceNow DevOps Change and wait for approval
-#         uses: ServiceNow/servicenow-devops-change@v6.1.0
-#         with:
-#           devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
-#           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
-#           instance-url: ${{ secrets.SN_INSTANCE_URL }}
-#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
-#           context-github: ${{ toJSON(github) }}
-#           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
-
-#           # Optional: customize change request fields
-#           change-request: >-
-#             {"setCloseCode":"true","autoCloseChange":true,
-#              "attributes":{"short_description":"Prod deploy",
-#                "description":"Automated deployment via GitHub Actions"}}
-
-#           # Polling settings: waits until approval
-#           interval: '30'     # seconds between checks
-#           timeout: '3600'    # max seconds to wait (1 hour)
-
-#       - name: Deploy to Production
-#         run: |
-#           echo "Approval received. Running Prod deployment..."
-#           # Add your deploy commands here
-
-#Updated with Auto approval conditions
-
 name: Prod Deploy
 
 on:
@@ -292,10 +220,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     name: Build & Test
-
-    # >>> Expose the prepared change-request JSON to other jobs
-    outputs:
-      changereq_json: ${{ steps.changereq.outputs.json }}
 
     steps:
       # Pin checkout to a full SHA (example: v4.2.2)
@@ -312,63 +236,12 @@ jobs:
       - name: SonarQube (SonarCloud) Scan
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # SonarCloud token
         with:
           args: >
             -Dsonar.organization=nidhishs91
             -Dsonar.projectKey=nidhishs91_Normal_website
             -Dsonar.sources=.
-
-      # ---------- Option 3: fetch coverage (safe) ----------
-      - name: Install jq (for JSON parsing)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-
-      - name: Fetch coverage from SonarCloud
-        id: coverage
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        run: |
-          RESPONSE=$(curl -s -u "${SONAR_TOKEN}:" \
-            "https://sonarcloud.io/api/measures/component?component=nidhishs91_Normal_website&metricKeys=coverage")
-          COVERAGE=$(echo "$RESPONSE" | jq -r '.component.measures[0].value // empty')
-
-          # Fallback if coverage is missing
-          if [ -z "$COVERAGE" ]; then
-            echo "Could not read coverage from SonarCloud. Defaulting to 0."
-            COVERAGE=0
-          fi
-
-          echo "CODE_COVERAGE=$COVERAGE" >> $GITHUB_ENV
-          echo "Resolved coverage: $COVERAGE"
-      # -----------------------------------------------------
-
-      # Build valid JSON for change-request and expose as step output
-      - name: Prepare change-request JSON (with policy inputs)
-        id: changereq
-        run: |
-          cat > change_request.json << 'EOF'
-          {
-            "setCloseCode": true,
-            "autoCloseChange": true,
-            "attributes": {
-              "short_description": "Prod deploy",
-              "description": "Automated deployment via GitHub Actions"
-            },
-            "policy_inputs": {
-              "commits_without_work_item": 0,
-              "code_coverage": CODE_COV_PLACEHOLDER,
-              "is_change_with_partial_data": false
-            }
-          }
-          EOF
-
-          # Inject numeric coverage value safely
-          sed -i "s/CODE_COV_PLACEHOLDER/${CODE_COVERAGE}/" change_request.json
-
-          # Output compact, valid JSON for the next job
-          echo "json=$(jq -c . change_request.json)" >> $GITHUB_OUTPUT
 
   ServiceNowDevOpsChange:
     needs: build
@@ -389,13 +262,140 @@ jobs:
           context-github: ${{ toJSON(github) }}
           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
 
-          change-request: ${{ needs.build.outputs.changereq_json }}
-          interval: '30'
-          timeout: '3600'
+          # Optional: customize change request fields
+          change-request: >-
+            {"setCloseCode":"true","autoCloseChange":true,
+             "attributes":{"short_description":"Prod deploy",
+               "description":"Automated deployment via GitHub Actions"}}
+
+          # Polling settings: waits until approval
+          interval: '30'     # seconds between checks
+          timeout: '3600'    # max seconds to wait (1 hour)
 
       - name: Deploy to Production
         run: |
           echo "Approval received. Running Prod deployment..."
           # Add your deploy commands here
+
+#Updated with Auto approval conditions
+
+# name: Prod Deploy
+
+# on:
+#   push:
+#     branches: [ main ]
+
+# permissions:
+#   contents: read
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+#     name: Build & Test
+
+#     # >>> Expose the prepared change-request JSON to other jobs
+#     outputs:
+#       changereq_json: ${{ steps.changereq.outputs.json }}
+
+#     steps:
+#       # Pin checkout to a full SHA (example: v4.2.2)
+#       - name: Checkout
+#         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+#         with:
+#           fetch-depth: 0  # improves Sonar reporting across commits
+
+#       - name: Build
+#         run: |
+#           echo "Build the project..."
+#           # Add your build commands here
+
+#       - name: SonarQube (SonarCloud) Scan
+#         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
+#         env:
+#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#         with:
+#           args: >
+#             -Dsonar.organization=nidhishs91
+#             -Dsonar.projectKey=nidhishs91_Normal_website
+#             -Dsonar.sources=.
+
+#       # ---------- Option 3: fetch coverage (safe) ----------
+#       - name: Install jq (for JSON parsing)
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y jq
+
+#       - name: Fetch coverage from SonarCloud
+#         id: coverage
+#         env:
+#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#         run: |
+#           RESPONSE=$(curl -s -u "${SONAR_TOKEN}:" \
+#             "https://sonarcloud.io/api/measures/component?component=nidhishs91_Normal_website&metricKeys=coverage")
+#           COVERAGE=$(echo "$RESPONSE" | jq -r '.component.measures[0].value // empty')
+
+#           # Fallback if coverage is missing
+#           if [ -z "$COVERAGE" ]; then
+#             echo "Could not read coverage from SonarCloud. Defaulting to 0."
+#             COVERAGE=0
+#           fi
+
+#           echo "CODE_COVERAGE=$COVERAGE" >> $GITHUB_ENV
+#           echo "Resolved coverage: $COVERAGE"
+#       # -----------------------------------------------------
+
+#       # Build valid JSON for change-request and expose as step output
+#       - name: Prepare change-request JSON (with policy inputs)
+#         id: changereq
+#         run: |
+#           cat > change_request.json << 'EOF'
+#           {
+#             "setCloseCode": true,
+#             "autoCloseChange": true,
+#             "attributes": {
+#               "short_description": "Prod deploy",
+#               "description": "Automated deployment via GitHub Actions"
+#             },
+#             "policy_inputs": {
+#               "commits_without_work_item": 0,
+#               "code_coverage": CODE_COV_PLACEHOLDER,
+#               "is_change_with_partial_data": false
+#             }
+#           }
+#           EOF
+
+#           # Inject numeric coverage value safely
+#           sed -i "s/CODE_COV_PLACEHOLDER/${CODE_COVERAGE}/" change_request.json
+
+#           # Output compact, valid JSON for the next job
+#           echo "json=$(jq -c . change_request.json)" >> $GITHUB_OUTPUT
+
+#   ServiceNowDevOpsChange:
+#     needs: build
+#     runs-on: ubuntu-latest
+#     name: ServiceNow DevOps Change (Prod Deploy)
+
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+#       - name: Create ServiceNow DevOps Change and wait for approval
+#         uses: ServiceNow/servicenow-devops-change@v6.1.0
+#         with:
+#           devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
+#           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+#           instance-url: ${{ secrets.SN_INSTANCE_URL }}
+#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+#           context-github: ${{ toJSON(github) }}
+#           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
+
+#           change-request: ${{ needs.build.outputs.changereq_json }}
+#           interval: '30'
+#           timeout: '3600'
+
+#       - name: Deploy to Production
+#         run: |
+#           echo "Approval received. Running Prod deployment..."
+#           # Add your deploy commands here
 
 
