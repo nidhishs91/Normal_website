@@ -264,7 +264,7 @@ jobs:
           # Optional: customize change request fields
           change-request: >-
             {
-            "setCloseCode":"true",
+            #"setCloseCode":"true",
             "autoCloseChange":"true",
              "attributes":
              {
