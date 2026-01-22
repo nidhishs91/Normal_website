@@ -264,7 +264,6 @@ jobs:
           # Optional: customize change request fields
           change-request: >-
             {
-            #"setCloseCode":"true",
             "autoCloseChange":"true",
              "attributes":
              {
@@ -272,6 +271,7 @@ jobs:
                "description":"Automated deployment via GitHub Actions"
                }
             }
+            #"setCloseCode":"true",
           # Polling settings: waits until approval
           interval: '30'     # seconds between checks
           timeout: '3600'    # max seconds to wait (1 hour)
