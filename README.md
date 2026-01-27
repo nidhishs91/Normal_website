@@ -6,6 +6,6 @@ Jira Native ID
 counter : 2
 
 Test
-Counter : 2
+Counter : 4
 
 
