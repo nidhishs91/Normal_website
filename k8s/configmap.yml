@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: normal-website-content
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Normal Website</title>
+      <link rel="stylesheet" href="styles.css">
+    </head>
+    <body>
+      <h1>Hello from Argo CD</h1>
+      <script src="script.js"></script>
+    </body>
+    </html>
+  styles.css: |
+    body {
+      font-family: Arial, sans-serif;
+    }
+  script.js: |
+    console.log("Hello from script.js");
