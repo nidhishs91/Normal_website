@@ -2,6 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: normal-website-content
+  namespace: default
 data:
   index.html: |
     <!DOCTYPE html>
