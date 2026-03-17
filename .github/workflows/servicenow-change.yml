@@ -268,9 +268,7 @@ jobs:
              "attributes":
              {
                "short_description":"Prod deploy",
-               "description":"Automated deployment via GitHub Actions",
-               "requested_by":"483c7325931721100143ad44246a4df3",
-               "assigned_to":"800b174138d089c868d09de320f9833b"
+               "description":"Automated deployment via GitHub Actions"
                }
             }
           # Polling settings: waits until approval
