@@ -142,7 +142,7 @@ jobs:
       # -----------------------------
       - name: Publish Test Results to ServiceNow DevOps Insights
         run: |
-          curl -X POST "${{ secrets.SN_INSTANCE_URL_DEMO14 }}/api/sn_devops/v1/devops/testresult" \
+          curl -X POST "${{ secrets.SN_INSTANCE_URL_DEMO14 }}/api/sn_devops/devops/testresult" \
           -H "Content-Type: application/json" \
           -u "${{ secrets.SN_DEVOPS_USER_DEMO14 }}:${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}" \
           -d '{
@@ -172,10 +172,10 @@ jobs:
       - name: Create ServiceNow DevOps Change and wait for approval
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
-          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD}}
+          instance-url: ${{ secrets.SN_INSTANCE_URL }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
           context-github: ${{ toJSON(github) }}
           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
 
@@ -184,9 +184,7 @@ jobs:
               "autoCloseChange":"true",
               "attributes":{
                 "short_description":"Prod deploy",
-                "description":"Automated deployment via GitHub Actions. Test results and quality metrics published.",
-                "u_detailed_validation_steps":"Automated tests and Sonar scan completed",
-                "u_communication_plan":"Standard deployment communication"
+                "description":"Automated deployment via GitHub Actions. Test results and quality metrics published."
               }
             }
 
