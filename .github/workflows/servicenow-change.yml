@@ -280,7 +280,7 @@
 #           echo "Approval received. Running Prod deployment..."
 #           # Add your deploy commands here
 
-name: Prod Deploy
+name: Prod Deploy with Test Insights
 
 on:
   push:
