@@ -162,7 +162,7 @@ jobs:
           TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
           DEVOPS_TOKEN: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN_DEMO14 }}
         run: |
-          curl -sS -X POST "$SN_URL/api/sn_devops/v1/devops/tool/test?toolId=$TOOL_ID&testType=Unit%20test" \
+          curl -sS -X POST "$SN_URL/api/sn_devops/v1/devops/tool/test?toolId=95e3bb8693e37a10ea1eb3ad1dba10d3&testType=Unit%20test" \
             -H "Content-Type: application/json" \
             -H "Authorization: sn_devops.DevOpsToken 95e3bb8693e37a10ea1eb3ad1dba10d3:SzaqrhwTN33PuxsYyAmu2ZKvLhvskKsn" \
             -d '{
