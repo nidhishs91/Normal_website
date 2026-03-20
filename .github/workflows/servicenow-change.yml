@@ -164,7 +164,7 @@ jobs:
         run: |
           curl -sS -X POST "$SN_URL/api/sn_devops/v1/devops/tool/test?toolId=$TOOL_ID&testType=Unit%20test" \
             -H "Content-Type: application/json" \
-            -H "Authorization: sn_devops.DevOpsToken $TOOL_ID:$DEVOPS_TOKEN" \
+            -H "Authorization: sn_devops.DevOpsToken 95e3bb8693e37a10ea1eb3ad1dba10d3:SzaqrhwTN33PuxsYyAmu2ZKvLhvskKsn" \
             -d '{
               "testExecutionName": "GitHub Actions Unit Tests",
               "branch": "'"${GITHUB_REF_NAME}"'",
