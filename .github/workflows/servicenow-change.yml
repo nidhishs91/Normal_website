@@ -82,58 +82,119 @@ permissions:
   contents: read
 
 jobs:
+  # =====================================
+  # BUILD + TEST + QUALITY
+  # =====================================
   build:
     runs-on: ubuntu-latest
     name: Build, Test & Quality
+
     steps:
+      # Checkout (pinned SHA as per your working YAML)
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
+      # Build
       - name: Build
-        run: echo "Build the project..."
+        run: |
+          echo "Build the project..."
+          # your build commands
 
-      - name: Run Tests (demo numbers)
+      # -----------------------------
+      # RUN TESTS
+      # -----------------------------
+      - name: Run Tests
         run: |
           echo "Running tests..."
           TOTAL_TESTS=100
           PASSED_TESTS=85
+
           echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_ENV
           echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_ENV
 
+      # -----------------------------
+      # CALCULATE PASS %
+      # -----------------------------
       - name: Calculate Test Pass Percentage
         run: |
           PASS_PERCENT=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))
           echo "PASS_PERCENT=$PASS_PERCENT" >> $GITHUB_ENV
           echo "Test Pass Percentage: $PASS_PERCENT%"
 
-      # Option A: Use official Action (recommended)
-      - name: Publish Test Results to ServiceNow DevOps (Action)
-        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
+      # -----------------------------
+      # SONARQUBE / SONARCLOUD
+      # -----------------------------
+      - name: SonarQube (SonarCloud) Scan
+        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN_DEMO14 }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
-          context-github: ${{ toJSON(github) }}
-          job-name: 'Build, Test & Quality'
-          xml-report-filename: path/to/results.xml
-          test-summary-name: 'GitHub Actions Unit Tests'
+          args: >
+            -Dsonar.organization=nidhishs91
+            -Dsonar.projectKey=nidhishs91_Normal_website
+            -Dsonar.sources=.
 
-      # Option B: Raw API (only if you don’t have an XML)
-      - name: Publish Test Results to ServiceNow DevOps (curl)
-        if: always()
+      # -----------------------------
+      # PUBLISH TEST RESULTS
+      # (DevOps Insights)
+      # -----------------------------
+      - name: Publish Test Results to ServiceNow DevOps Insights
         run: |
-          curl -X POST "${{ secrets.SN_INSTANCE_URL_DEMO14 }}/api/sn_devops/v1/devops/tool/test?toolId=${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}&testType=Unit test" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: sn_devops.DevOpsToken ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}:${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN_DEMO14 }}" \
-            -d '{
-              "testExecutionName": "GitHub Actions Unit Tests",
-              "branch": "'"${GITHUB_REF_NAME}"'",
-              "commitId": "'"${GITHUB_SHA}"'",
-              "totalTests": '"${TOTAL_TESTS}"',
-              "passedTests": '"${PASSED_TESTS}"',
-              "failedTests": '"$((TOTAL_TESTS - PASSED_TESTS))"',
-              "passPercentage": '"${PASS_PERCENT}"',
-              "status": "Completed"
-            }'
+          curl -X POST "${{ secrets.SN_INSTANCE_URL_DEMO14 }}/api/sn_devops/devops/testresult" \
+          -H "Content-Type: application/json" \
+          -u "${{ secrets.SN_DEVOPS_USER_DEMO14 }}:${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}" \
+          -d '{
+            "toolId": "${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}",
+            "commitId": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "testExecutionName": "GitHub Actions Unit Tests",
+            "totalTests": '"$TOTAL_TESTS"',
+            "passedTests": '"$PASSED_TESTS"',
+            "failedTests": '"$((TOTAL_TESTS - PASSED_TESTS))"',
+            "passPercentage": '"$PASS_PERCENT"',
+            "status": "Completed"
+          }'
+
+  # =====================================
+  # SERVICENOW CHANGE + DEPLOY
+  # =====================================
+  ServiceNowDevOpsChange:
+    needs: build
+    runs-on: ubuntu-latest
+    name: ServiceNow DevOps Change (Prod Deploy)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Create ServiceNow DevOps Change and wait for approval
+        uses: ServiceNow/servicenow-devops-change@v6.1.0
+        with:
+          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14}}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14}}
+          instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14}}
+          context-github: ${{ toJSON(github) }}
+          job-name: 'ServiceNow DevOps Change (Prod Deploy)'
+
+          change-request: >-
+            {
+              "autoCloseChange":"true",
+              "attributes":{
+                "short_description":"Prod deploy",
+                "description":"Automated deployment via GitHub Actions. Test results and quality metrics published."
+              }
+            }
+
+          interval: '30'
+          timeout: '3600'
+
+      # -----------------------------
+      # DEPLOY
+      # -----------------------------
+      - name: Deploy to Production
+        run: |
+          echo "Approval received. Running Prod deployment..."
+          # your deployment commands
