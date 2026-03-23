@@ -140,42 +140,22 @@ jobs:
       # PUBLISH TEST RESULTS
       # (DevOps Insights)
       # -----------------------------
-      # - name: Publish Test Results to ServiceNow DevOps Insights
-      #   run: |
-      #     curl -X POST "${{ secrets.SN_INSTANCE_URL_DEMO14 }}/api/sn_devops/devops/testresult" \
-      #     -H "Content-Type: application/json" \
-      #     -u "${{ secrets.SN_DEVOPS_USER_DEMO14 }}:${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}" \
-      #     -d '{
-      #       "toolId": "${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}",
-      #       "commitId": "${{ github.sha }}",
-      #       "branch": "${{ github.ref_name }}",
-      #       "testExecutionName": "GitHub Actions Unit Tests",
-      #       "totalTests": '"$TOTAL_TESTS"',
-      #       "passedTests": '"$PASSED_TESTS"',
-      #       "failedTests": '"$((TOTAL_TESTS - PASSED_TESTS))"',
-      #       "passPercentage": '"$PASS_PERCENT"',
-      #       "status": "Completed"
-      #     }'
       - name: Publish Test Results to ServiceNow DevOps Insights
-        env:
-          SN_URL: https://coforgelimiteddemo14.service-now.com
-          TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
-          DEVOPS_TOKEN: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN_DEMO14 }}
         run: |
-          curl -sS -X POST "$SN_URL/api/sn_devops/v1/devops/tool/test?toolId=95e3bb8693e37a10ea1eb3ad1dba10d3&testType=Unit%20test" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: sn_devops.DevOpsToken 95e3bb8693e37a10ea1eb3ad1dba10d3:SzaqrhwTN33PuxsYyAmu2ZKvLhvskKsn" \
-            -d '{
-              "testExecutionName": "GitHub Actions Unit Tests",
-              "branch": "'"${GITHUB_REF_NAME}"'",
-              "commitId": "'"${GITHUB_SHA}"'",
-              "totalTests": '"${TOTAL_TESTS}"',
-              "passedTests": '"${PASSED_TESTS}"',
-              "failedTests": '"$((TOTAL_TESTS - PASSED_TESTS))"',
-              "passPercentage": '"${PASS_PERCENT}"',
-              "status": "Completed"
-            }'
-
+          curl -X POST "${{ secrets.SN_INSTANCE_URL_DEMO14 }}/api/sn_devops/devops/testresult" \
+          -H "Content-Type: application/json" \
+          -u "${{ secrets.SN_DEVOPS_USER_DEMO14 }}:${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}" \
+          -d '{
+            "toolId": "${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}",
+            "commitId": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "testExecutionName": "GitHub Actions Unit Tests",
+            "totalTests": '"$TOTAL_TESTS"',
+            "passedTests": '"$PASSED_TESTS"',
+            "failedTests": '"$((TOTAL_TESTS - PASSED_TESTS))"',
+            "passPercentage": '"$PASS_PERCENT"',
+            "status": "Completed"
+          }'
 
   # =====================================
   # SERVICENOW CHANGE + DEPLOY
