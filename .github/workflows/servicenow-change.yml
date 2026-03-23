@@ -118,7 +118,7 @@ jobs:
           SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }} # or hardcode your tool sys_id
         run: |
           set -euo pipefail
-          API_URL="${SN_URL}/api/sn_devops/v1/devops/tool/test?toolId=${SN_TOOL}&testType=JUnit"
+          API_URL="${SN_URL}/api/sn_devops/v1/devops/tool/test?toolId=95e3bb8693e37a10ea1eb3ad1dba10d3&testType=JUnit"
 
           cat > body.json <<JSON
           {
