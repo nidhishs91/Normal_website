@@ -1,79 +1,5 @@
-#Working YAML....USE THIS ONE !!!
-# name: Prod Deploy
-
-# on:
-#   push:
-#     branches: [ main ]
-
-# permissions:
-#   contents: read
-
-# jobs:
-#   build:
-#     runs-on: ubuntu-latest
-#     name: Build & Test
-
-#     steps:
-#       # Pin checkout to a full SHA (example: v4.2.2)
-#       - name: Checkout
-#         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-#         with:
-#           fetch-depth: 0  # improves Sonar reporting across commits
-
-#       - name: Build
-#         run: |
-#           echo "Build the project..."
-#           # Add your build commands here
-
-#       - name: SonarQube (SonarCloud) Scan
-#         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
-#         env:
-#           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}  # SonarCloud token
-#         with:
-#           args: >
-#             -Dsonar.organization=nidhishs91
-#             -Dsonar.projectKey=nidhishs91_Normal_website
-#             -Dsonar.sources=.
-
-#   ServiceNowDevOpsChange:
-#     needs: build
-#     runs-on: ubuntu-latest
-#     name: ServiceNow DevOps Change (Prod Deploy)
-
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-#       - name: Create ServiceNow DevOps Change and wait for approval
-#         uses: ServiceNow/servicenow-devops-change@v6.1.0
-#         with:
-#           devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
-#           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-#           instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-#           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
-#           context-github: ${{ toJSON(github) }}
-#           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
-
-#           # Optional: customize change request fields
-#           change-request: >-
-#             {
-#             "autoCloseChange":"true",
-#              "attributes":
-#              {
-#                "short_description":"Prod deploy",
-#                "description":"Automated deployment via GitHub Actions"
-#                }
-#             }
-#           # Polling settings: waits until approval
-#           interval: '30'     # seconds between checks
-#           timeout: '3600'    # max seconds to wait (1 hour)
-
-#       - name: Deploy to Production
-#         run: |
-#           echo "Approval received. Running Prod deployment..."
-#           # Add your deploy commands here
-
 name: Prod Deploy
+
 on:
   push:
     branches: [ main ]
@@ -90,7 +16,7 @@ jobs:
     name: Build, Test & Quality
 
     steps:
-      # Checkout (pinned SHA as per your working YAML)
+      # Checkout (pinned SHA)
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
@@ -111,8 +37,8 @@ jobs:
           TOTAL_TESTS=100
           PASSED_TESTS=85
 
-          echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_ENV
-          echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_ENV
+          echo "TOTAL_TESTS=$TOTAL_TESTS" >> "$GITHUB_ENV"
+          echo "PASSED_TESTS=$PASSED_TESTS" >> "$GITHUB_ENV"
 
       # -----------------------------
       # CALCULATE PASS %
@@ -120,7 +46,7 @@ jobs:
       - name: Calculate Test Pass Percentage
         run: |
           PASS_PERCENT=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))
-          echo "PASS_PERCENT=$PASS_PERCENT" >> $GITHUB_ENV
+          echo "PASS_PERCENT=$PASS_PERCENT" >> "$GITHUB_ENV"
           echo "Test Pass Percentage: $PASS_PERCENT%"
 
       # -----------------------------
@@ -130,6 +56,7 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
         with:
           args: >
             -Dsonar.organization=nidhishs91
@@ -137,25 +64,56 @@ jobs:
             -Dsonar.sources=.
 
       # -----------------------------
-      # PUBLISH TEST RESULTS
-      # (DevOps Insights)
+      # PUBLISH TEST RESULTS (Insights)
       # -----------------------------
       - name: Publish Test Results to ServiceNow DevOps Insights
+        env:
+          SN_URL: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
+          SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
+          SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
+          TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRANCH_NAME: ${{ github.ref_name }}
         run: |
-          curl -X POST "${{ secrets.SN_INSTANCE_URL_DEMO14 }}/api/sn_devops/devops/testresult" \
-          -H "Content-Type: application/json" \
-          -u "${{ secrets.SN_DEVOPS_USER_DEMO14 }}:${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}" \
-          -d '{
-            "toolId": "${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}",
-            "commitId": "${{ github.sha }}",
-            "branch": "${{ github.ref_name }}",
+          FAILED_TESTS=$(( TOTAL_TESTS - PASSED_TESTS ))
+          cat > payload.json <<'JSON'
+          {
+            "toolId": "__TOOL_ID__",
+            "commitId": "__COMMIT_SHA__",
+            "branch": "__BRANCH_NAME__",
             "testExecutionName": "GitHub Actions Unit Tests",
-            "totalTests": '"$TOTAL_TESTS"',
-            "passedTests": '"$PASSED_TESTS"',
-            "failedTests": '"$((TOTAL_TESTS - PASSED_TESTS))"',
-            "passPercentage": '"$PASS_PERCENT"',
+            "totalTests": __TOTAL__,
+            "passedTests": __PASSED__,
+            "failedTests": __FAILED__,
+            "passPercentage": __PERCENT__,
             "status": "Completed"
-          }'
+          }
+          JSON
+
+          # substitute variables safely
+          sed -i "s|__TOOL_ID__|$TOOL_ID|g" payload.json
+          sed -i "s|__COMMIT_SHA__|$COMMIT_SHA|g" payload.json
+          sed -i "s|__BRANCH_NAME__|$BRANCH_NAME|g" payload.json
+          sed -i "s|__TOTAL__|$TOTAL_TESTS|g" payload.json
+          sed -i "s|__PASSED__|$PASSED_TESTS|g" payload.json
+          sed -i "s|__FAILED__|$FAILED_TESTS|g" payload.json
+          sed -i "s|__PERCENT__|$PASS_PERCENT|g" payload.json
+
+          echo "Posting test results to ServiceNow Insights..."
+          http_code=$(curl -sS -w "%{http_code}" -o resp.json \
+            -X POST "$SN_URL/api/sn_devops/devops/testresult" \
+            -u "$SN_USER:$SN_PASS" \
+            -H "Content-Type: application/json" \
+            --data-binary @payload.json)
+
+          echo "HTTP: $http_code"
+          echo "Response:"
+          cat resp.json
+
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "Failed to publish test results to ServiceNow. Exiting."
+            exit 1
+          fi
 
   # =====================================
   # SERVICENOW CHANGE + DEPLOY
@@ -172,13 +130,12 @@ jobs:
       - name: Create ServiceNow DevOps Change and wait for approval
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14}}
-          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14}}
+          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
           instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14}}
+          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
           context-github: ${{ toJSON(github) }}
           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
-
           change-request: >-
             {
               "autoCloseChange":"true",
@@ -187,13 +144,9 @@ jobs:
                 "description":"Automated deployment via GitHub Actions. Test results and quality metrics published."
               }
             }
-
           interval: '30'
           timeout: '3600'
 
-      # -----------------------------
-      # DEPLOY
-      # -----------------------------
       - name: Deploy to Production
         run: |
           echo "Approval received. Running Prod deployment..."
