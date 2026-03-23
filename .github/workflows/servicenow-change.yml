@@ -26,7 +26,6 @@ jobs:
         run: |
           echo "Build the project..."
           # your build commands
-          
 
       # -----------------------------
       # RUN TESTS (sample numbers)
@@ -108,37 +107,7 @@ jobs:
             -H "Content-Type: application/json" \
             -u "$SN_USER:$SN_PASS" \
             --data @body.json
-            
-            name: Test API Call Perf
-            
-            on:  
-            workflow_dispatch:
-            
-            jobs:
-  post_api_call_perf:
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v2
 
-    - name: post_api_call_perf
-      run: |
-        apiUrl="https://<your_instance>.service-now.com/api/sn_devops/v1/devops/tool/test?toolId=<devops_ToolId>&testType=<performance_test_type>"
-        requestBody='{"toolId": "<devops_ToolId>", "buildNumber": '${{ github.run_number }}' , "workflow": "Test API Call Perf", "repository": "<your_GitHub_repository>", "stageName":"post_api_call_perf","pipelineName":"Test API Call Perf", "testType": "Load", "buildNumber": '${{ github.run_number }}', "buildId": '${{ github.run_id }}' , "attemptNumber" : '${{ github.run_attempt }}', "name": "GitHub Test Summary - Performance 1.0","duration": 0.0,"maximumVirtualUsers": 10,"throughput": "5/min","maximumTime": 1000,"minimumTime": 5000,"averageTime": 7000,"startTime": "2023-12-14T23:31:31z","finishTime": "2023-12-14T23:31:31z","ninetyPercent": 8000, "standardDeviation": 2.0 }'
-        auth="devops.integration.user:<password> in base64 encoded"
-        authHeader="Basic $auth"
-        response=$(curl -X POST -H "Content-Type: application/json" -H "Authorization: $authHeader" -d "$requestBody" $apiUrl)
-        exitCode=$?
-        
-        if [ $exitCode -eq 0 ]; then
-          echo "API call successful!"
-          echo "Response: $response"
-        else
-          echo "API call failed!"
-          echo "Response: $response"
-          exit 1
-        fi
   # =====================================
   # SERVICENOW CHANGE + DEPLOY
   # =====================================
