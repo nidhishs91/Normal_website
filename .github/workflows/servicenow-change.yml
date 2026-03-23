@@ -32,6 +32,14 @@ jobs:
           echo "PASSED_TESTS=$PASSED_TESTS" >> "$GITHUB_ENV"
           echo "PASS_PERCENT=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))" >> "$GITHUB_ENV"
 
+          # Minimal JUnit XML (replace with your real framework's report)
+          mkdir -p reports
+          cat > reports/junit.xml <<'XML'
+          <testsuite name="dummy" tests="100" failures="15" errors="0" skipped="0">
+            <testcase classname="demo" name="sample1"/>
+          </testsuite>
+          XML
+
       - name: SonarQube (SonarCloud) Scan
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
         env:
@@ -43,52 +51,24 @@ jobs:
             -Dsonar.projectKey=nidhishs91_Normal_website
             -Dsonar.sources=.
 
-      # ---- Publish Test Results via DevOps tool capability API (fixed URI) ----
-      - name: Publish Test Results to ServiceNow DevOps
-        env:
-          SN_URL:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-          SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
-          SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
-          COMMIT_SHA: ${{ github.sha }}
-          BRANCH_NAME: ${{ github.ref_name }}
-        run: |
-          FAILED_TESTS=$(( TOTAL_TESTS - PASSED_TESTS ))
-          cat > payload.json <<'JSON'
-          {
-            "toolId": "__TOOL_ID__",
-            "testExecutionName": "GitHub Actions Unit Tests",
-            "branch": "__BRANCH_NAME__",
-            "commitId": "__COMMIT_SHA__",
-            "totalTests": __TOTAL__,
-            "passedTests": __PASSED__,
-            "failedTests": __FAILED__,
-            "passPercentage": __PERCENT__,
-            "status": "Completed",
-            "testType": "JUnit"
-          }
-          JSON
+      # ---- Publish Unit Test Results to ServiceNow DevOps (official action) ----
+      - name: Publish Unit Test Results to ServiceNow DevOps
+        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
+        with:
+          # Use ONE auth method. Token (preferred) or Basic:
+          # devops-integration-token: ${{ secrets.SN_DEVOPS_INTEGRATION_TOKEN }}
+          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
 
-          sed -i "s|__TOOL_ID__|$TOOL_ID|g" payload.json
-          sed -i "s|__BRANCH_NAME__|$BRANCH_NAME|g" payload.json
-          sed -i "s|__COMMIT_SHA__|$COMMIT_SHA|g" payload.json
-          sed -i "s|__TOTAL__|$TOTAL_TESTS|g" payload.json
-          sed -i "s|__PASSED__|$PASSED_TESTS|g" payload.json
-          sed -i "s|__FAILED__|$FAILED_TESTS|g" payload.json
-          sed -i "s|__PERCENT__|$PASS_PERCENT|g" payload.json
+          instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
 
-          echo "Posting test results to ServiceNow DevOps..."
-          http_code=$(curl -sS -w "%{http_code}" -o resp.json \
-            -X POST "$SN_URL/api/sn_devops/devops/tool/test" \
-            -u "$SN_USER:$SN_PASS" \
-            -H "Content-Type: application/json" \
-            --data-binary @payload.json)
+          # IMPORTANT: This MUST be the sys_id of your *GitHub Tool* in ServiceNow
+          tool-id: ${{ secrets.SN_GITHUB_TOOL_ID_DEMO14 }}
 
-          echo "HTTP: $http_code"; cat resp.json
-          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
-            echo "Failed to publish test results to ServiceNow. Exiting."
-            exit 1
-          fi
+          context-github: ${{ toJSON(github) }}
+          job-name: 'Build, Test & Quality'
+          xml-report-filename: reports/junit.xml
+          test-summary-name:   'GitHub Actions Unit Tests'
 
   ServiceNowDevOpsChange:
     needs: build
@@ -105,7 +85,10 @@ jobs:
           devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
           instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
+
+          # For the change step, orchestration tool id is fine — leave as-is if it worked earlier.
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+
           context-github: ${{ toJSON(github) }}
           job-name: 'ServiceNow DevOps Change (Prod Deploy)'
           change-request: >-
