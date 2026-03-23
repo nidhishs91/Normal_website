@@ -8,50 +8,30 @@ permissions:
   contents: read
 
 jobs:
-  # =====================================
-  # BUILD + TEST + QUALITY
-  # =====================================
   build:
     runs-on: ubuntu-latest
     name: Build, Test & Quality
 
     steps:
-      # Checkout (pinned SHA)
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
-      # Build
       - name: Build
         run: |
           echo "Build the project..."
           # your build commands
 
-      # -----------------------------
-      # RUN TESTS
-      # -----------------------------
-      - name: Run Tests
+      - name: Run Tests (dummy numbers for now)
         run: |
           echo "Running tests..."
           TOTAL_TESTS=100
           PASSED_TESTS=85
-
           echo "TOTAL_TESTS=$TOTAL_TESTS" >> "$GITHUB_ENV"
           echo "PASSED_TESTS=$PASSED_TESTS" >> "$GITHUB_ENV"
+          echo "PASS_PERCENT=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))" >> "$GITHUB_ENV"
 
-      # -----------------------------
-      # CALCULATE PASS %
-      # -----------------------------
-      - name: Calculate Test Pass Percentage
-        run: |
-          PASS_PERCENT=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))
-          echo "PASS_PERCENT=$PASS_PERCENT" >> "$GITHUB_ENV"
-          echo "Test Pass Percentage: $PASS_PERCENT%"
-
-      # -----------------------------
-      # SONARQUBE / SONARCLOUD
-      # -----------------------------
       - name: SonarQube (SonarCloud) Scan
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
         env:
@@ -63,12 +43,10 @@ jobs:
             -Dsonar.projectKey=nidhishs91_Normal_website
             -Dsonar.sources=.
 
-      # -----------------------------
-      # PUBLISH TEST RESULTS (Insights)
-      # -----------------------------
-      - name: Publish Test Results to ServiceNow DevOps Insights
+      # ---- Publish Test Results via DevOps tool capability API (fixed URI) ----
+      - name: Publish Test Results to ServiceNow DevOps
         env:
-          SN_URL: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
+          SN_URL:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
           SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
           TOOL_ID: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
@@ -79,45 +57,39 @@ jobs:
           cat > payload.json <<'JSON'
           {
             "toolId": "__TOOL_ID__",
-            "commitId": "__COMMIT_SHA__",
-            "branch": "__BRANCH_NAME__",
             "testExecutionName": "GitHub Actions Unit Tests",
+            "branch": "__BRANCH_NAME__",
+            "commitId": "__COMMIT_SHA__",
             "totalTests": __TOTAL__,
             "passedTests": __PASSED__,
             "failedTests": __FAILED__,
             "passPercentage": __PERCENT__,
-            "status": "Completed"
+            "status": "Completed",
+            "testType": "JUnit"
           }
           JSON
 
-          # substitute variables safely
           sed -i "s|__TOOL_ID__|$TOOL_ID|g" payload.json
-          sed -i "s|__COMMIT_SHA__|$COMMIT_SHA|g" payload.json
           sed -i "s|__BRANCH_NAME__|$BRANCH_NAME|g" payload.json
+          sed -i "s|__COMMIT_SHA__|$COMMIT_SHA|g" payload.json
           sed -i "s|__TOTAL__|$TOTAL_TESTS|g" payload.json
           sed -i "s|__PASSED__|$PASSED_TESTS|g" payload.json
           sed -i "s|__FAILED__|$FAILED_TESTS|g" payload.json
           sed -i "s|__PERCENT__|$PASS_PERCENT|g" payload.json
 
-          echo "Posting test results to ServiceNow Insights..."
+          echo "Posting test results to ServiceNow DevOps..."
           http_code=$(curl -sS -w "%{http_code}" -o resp.json \
-            -X POST "$SN_URL/api/sn_devops/devops/testresult" \
+            -X POST "$SN_URL/api/sn_devops/devops/tool/test" \
             -u "$SN_USER:$SN_PASS" \
             -H "Content-Type: application/json" \
             --data-binary @payload.json)
 
-          echo "HTTP: $http_code"
-          echo "Response:"
-          cat resp.json
-
+          echo "HTTP: $http_code"; cat resp.json
           if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
             echo "Failed to publish test results to ServiceNow. Exiting."
             exit 1
           fi
 
-  # =====================================
-  # SERVICENOW CHANGE + DEPLOY
-  # =====================================
   ServiceNowDevOpsChange:
     needs: build
     runs-on: ubuntu-latest
