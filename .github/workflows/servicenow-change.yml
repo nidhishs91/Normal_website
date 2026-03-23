@@ -78,7 +78,7 @@ jobs:
           SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
           SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
         run: |
-          API_URL="$SN_URL/api/sn_devops/v1/devops/tool/test?toolId=$SN_TOOL&testType=Unit"
+          API_URL="$SN_URL/api/sn_devops/v1/devops/tool/test?toolId=95e3bb8693e37a10ea1eb3ad1dba10d3&testType=Unit"
 
           # Build the JSON body with run & repo context so SN can link to commit/pipeline
           cat > body.json <<JSON
