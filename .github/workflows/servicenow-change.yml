@@ -68,22 +68,45 @@ jobs:
             -Dsonar.projectKey=nidhishs91_Normal_website
             -Dsonar.sources=.
 
-    
-      # -----------------------------------------------------------
-      # REGISTER UNIT TEST RESULTS IN SERVICENOW (OFFICIAL ACTION)
-      # -----------------------------------------------------------
-      - name: ServiceNow DevOps Unit Test Results
-        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
-        with:
-          devops-integration-user-name:  ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
-          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          instance-url:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-          tool-id:  ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
-          context-github:  ${{ toJSON(github) }}
-          job-name:  'Build, Test & Quality'         # MUST match the job's display name above
-          xml-report-filename:  target/surefire-reports/  # directory containing JUnit XMLs
+      # -----------------------------
+      # PUBLISH TEST SUMMARY TO SERVICENOW (CORRECT ENDPOINT)
+      # -----------------------------
+      - name: Publish Test Summary to ServiceNow DevOps
+        env:
+          SN_URL: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
+          SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
+          SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
+          SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+        run: |
+          API_URL="$SN_URL/api/sn_devops/v1/devops/tool/test?toolId=$SN_TOOL&testType=Unit"
 
-            
+          # Build the JSON body with run & repo context so SN can link to commit/pipeline
+          cat > body.json <<JSON
+          {
+            "name": "GitHub Actions Unit Tests",
+            "pipelineName": "${{ github.workflow }}",
+            "stageName": "Build, Test & Quality",
+            "buildNumber": "${{ github.run_number }}",
+            "buildId": "${{ github.run_id }}",
+            "attemptNumber": "${{ github.run_attempt }}",
+            "repository": "${{ github.repository }}",
+            "branch": "${{ github.ref_name }}",
+            "startTime": "${{ steps.times.outputs.start }}",
+            "finishTime": "${{ steps.times.outputs.finish }}",
+            "totalTests": ${TOTAL_TESTS},
+            "passedTests": ${PASSED_TESTS},
+            "failedTests": $((TOTAL_TESTS - PASSED_TESTS)),
+            "skippedTests": 0,
+            "blockedTests": 0,
+            "duration": 0.0
+          }
+          JSON
+
+          echo "Calling ServiceNow Test API: $API_URL"
+          curl -sS -X POST "$API_URL" \
+            -H "Content-Type: application/json" \
+            -u "$SN_USER:$SN_PASS" \
+            --data @body.json
 
   # =====================================
   # SERVICENOW CHANGE + DEPLOY
