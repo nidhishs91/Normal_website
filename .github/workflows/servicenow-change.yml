@@ -13,7 +13,7 @@ jobs:
   # =====================================
   build:
     runs-on: ubuntu-latest
-    name: Build, Test & Quality
+    name: Build, Test & Quality   # NOTE: & (not &amp;)
 
     steps:
       # Checkout pinned to a SHA
@@ -37,6 +37,8 @@ jobs:
           PASSED_TESTS=85
           echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_ENV
           echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_ENV
+          # If you already produce JUnit XMLs, ensure they are in target/surefire-reports/
+          # If you don't produce XMLs yet, tell me your stack and I’ll add a tiny XML generator.
 
       # -----------------------------
       # CALCULATE PASS %
@@ -47,12 +49,11 @@ jobs:
           echo "PASS_PERCENT=$PASS_PERCENT" >> $GITHUB_ENV
           echo "Test Pass Percentage: $PASS_PERCENT%"
 
-      # Capture timestamps to correlate in ServiceNow
+      # Capture timestamps (optional, useful if you also keep a curl step)
       - name: Set timestamps
         id: times
         run: |
           echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
-          # Simulate duration; in real runs, set 'finish' after tests
           echo "finish=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
 
       # -----------------------------
@@ -68,45 +69,19 @@ jobs:
             -Dsonar.projectKey=nidhishs91_Normal_website
             -Dsonar.sources=.
 
-      # -----------------------------
-      # PUBLISH TEST SUMMARY TO SERVICENOW (CORRECT ENDPOINT)
-      # -----------------------------
-      - name: Publish Test Summary to ServiceNow DevOps
-        env:
-          SN_URL: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-          SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
-          SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
-        run: |
-          API_URL="POST /api/sn_devops/v1/devops/tool/test?toolId=95e3bb8693e37a10ea1eb3ad1dba10d3&testType=Unit"
-
-          # Build the JSON body with run & repo context so SN can link to commit/pipeline
-          cat > body.json <<JSON
-          {
-            "name": "GitHub Actions Unit Tests",
-            "pipelineName": "${{ github.workflow }}",
-            "stageName": "Build, Test & Quality",
-            "buildNumber": "${{ github.run_number }}",
-            "buildId": "${{ github.run_id }}",
-            "attemptNumber": "${{ github.run_attempt }}",
-            "repository": "${{ github.repository }}",
-            "branch": "${{ github.ref_name }}",
-            "startTime": "${{ steps.times.outputs.start }}",
-            "finishTime": "${{ steps.times.outputs.finish }}",
-            "totalTests": ${TOTAL_TESTS},
-            "passedTests": ${PASSED_TESTS},
-            "failedTests": $((TOTAL_TESTS - PASSED_TESTS)),
-            "skippedTests": 0,
-            "blockedTests": 0,
-            "duration": 0.0
-          }
-          JSON
-
-          echo "Calling ServiceNow Test API: $API_URL"
-          curl -sS -X POST "$API_URL" \
-            -H "Content-Type: application/json" \
-            -u "$SN_USER:$SN_PASS" \
-            --data @body.json
+      # -----------------------------------------------------------
+      # REGISTER UNIT TEST RESULTS IN SERVICENOW (OFFICIAL ACTION)
+      # -----------------------------------------------------------
+      - name: ServiceNow DevOps Unit Test Results
+        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
+        with:
+          devops-integration-user-name:  ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
+          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
+          instance-url:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}   # e.g., https://coforgelimiteddemo14.service-now.com
+          tool-id:  ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+          context-github:  ${{ toJSON(github) }}
+          job-name:  'Build, Test & Quality'     # MUST match the job's display name
+          xml-report-filename:  target/surefire-reports/  # folder or XML file with results
 
   # =====================================
   # SERVICENOW CHANGE + DEPLOY
