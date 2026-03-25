@@ -8,30 +8,23 @@ permissions:
   contents: read
 
 jobs:
-  # =====================================
-  # BUILD + TEST + QUALITY
-  # =====================================
   build:
     runs-on: ubuntu-latest
     name: Build, Test & Quality
 
     steps:
-      # Checkout pinned to a SHA
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
-      # ========================================
-      # *** REQUIRED FOR DEVOPS DASHBOARD ***
-      # SEND COMMIT EVENT (SCMEvent)
-      # ========================================
+      # ✅ SEND SCM COMMIT EVENT (must use SCM tool)
       - name: Send SCM Commit Event to ServiceNow
         env:
           SN_URL:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
           SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+          SN_TOOL: ${{ secrets.SN_SCM_TOOL_ID_DEMO14 }}
         run: |
           curl -X POST "$SN_URL/api/sn_devops/v1/devops/tool/SCMEvent?toolId=${SN_TOOL}" \
             -H "Content-Type: application/json" \
@@ -43,16 +36,14 @@ jobs:
               \"eventType\": \"commit\"
             }"
 
-      # ========================================
-      # SEND PIPELINE START EVENT
-      # ========================================
+      # ✅ PIPELINE START (must use SCM tool)
       - name: Start Pipeline Event
         id: pipelineStart
         env:
           SN_URL:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
           SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+          SN_TOOL: ${{ secrets.SN_SCM_TOOL_ID_DEMO14 }}
         run: |
           startTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           echo "start=$startTime" >> $GITHUB_OUTPUT
@@ -68,16 +59,11 @@ jobs:
               \"commitId\": \"${{ github.sha }}\"
             }"
 
-      # ========================================
-      # YOUR BUILD + TEST STEPS
-      # ========================================
       - name: Build
-        run: |
-          echo "Build the project..."
+        run: echo "Build the project..."
 
       - name: Run Tests
         run: |
-          echo "Running tests..."
           TOTAL_TESTS=100
           PASSED_TESTS=85
           echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_ENV
@@ -87,7 +73,6 @@ jobs:
         run: |
           PASS_PERCENT=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))
           echo "PASS_PERCENT=$PASS_PERCENT" >> $GITHUB_ENV
-          echo "Test Pass Percentage: $PASS_PERCENT%"
 
       - name: Set timestamps
         id: times
@@ -112,11 +97,7 @@ jobs:
           sed -i "s/\${FAILED}/$FAILED/g" target/surefire-reports/junit-report.xml
           sed -i "s/\${SKIPPED}/$SKIPPED/g" target/surefire-reports/junit-report.xml
           sed -i "s/\${DURATION}/$DURATION/g" target/surefire-reports/junit-report.xml
-          ls -l target/surefire-reports/
 
-      # ========================================
-      # SONAR SCAN
-      # ========================================
       - name: SonarQube (SonarCloud) Scan
         uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
         env:
@@ -127,31 +108,26 @@ jobs:
             -Dsonar.projectKey=nidhishs91_Normal_website
             -Dsonar.sources=.
 
-      # ========================================
-      # PUBLISH JUNIT TO SN (ACTION)
-      # ========================================
+      # ✅ SN OFFICIAL TEST REPORT ACTION
       - name: ServiceNow DevOps Unit Test Results
         uses: ServiceNow/servicenow-devops-test-report@v6.0.0
         with:
           devops-integration-user-name:  ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
           instance-url:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-          tool-id:  ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+          tool-id:  ${{ secrets.SN_SCM_TOOL_ID_DEMO14 }}
           context-github:  ${{ toJSON(github) }}
-          job-name:  'Build, Test & Quality'
-          xml-report-filename:  target/surefire-reports/junit-report.xml
+          job-name: 'Build, Test & Quality'
+          xml-report-filename: target/surefire-reports/junit-report.xml
 
-      # ========================================
-      # SEND TEST SUMMARY API
-      # ========================================
-      - name: Publish Test Summary via Test API (ensures joins)
+      # ✅ TEST SUMMARY API (must use SCM tool)
+      - name: Publish Test Summary via Test API
         env:
           SN_URL:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
           SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+          SN_TOOL: ${{ secrets.SN_SCM_TOOL_ID_DEMO14 }}
         run: |
-          set -euo pipefail
           API_URL="${SN_URL}/api/sn_devops/v1/devops/tool/test?toolId=${SN_TOOL}&testType=JUnit"
 
           cat > body.json <<JSON
@@ -182,15 +158,13 @@ jobs:
             -u "$SN_USER:$SN_PASS" \
             --data @body.json
 
-      # ========================================
-      # SEND PIPELINE FINISH EVENT
-      # ========================================
+      # ✅ PIPELINE FINISH (must use SCM tool)
       - name: Finish Pipeline Event
         env:
           SN_URL:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
           SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
+          SN_TOOL: ${{ secrets.SN_SCM_TOOL_ID_DEMO14 }}
         run: |
           finishTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -207,9 +181,7 @@ jobs:
               \"commitId\": \"${{ github.sha }}\"
             }"
 
-  # =====================================
-  # SERVICENOW CHANGE + DEPLOY
-  # =====================================
+  # ✅ CHANGE JOB (no change needed)
   ServiceNowDevOpsChange:
     needs: build
     runs-on: ubuntu-latest
@@ -222,7 +194,7 @@ jobs:
       - name: Create ServiceNow DevOps Change and wait for approval
         uses: ServiceNow/servicenow-devops-change@v6.1.0
         with:
-          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
+          devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
           instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
           tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
@@ -240,5 +212,4 @@ jobs:
           timeout: '3600'
 
       - name: Deploy to Production
-        run: |
-          echo "Approval received. Running Prod deployment..."
+        run: echo "Approval received. Running Prod deployment..."
