@@ -28,22 +28,15 @@ jobs:
           # your build commands
 
       # -----------------------------
-      # RUN TESTS (NOW DYNAMIC)
+      # RUN TESTS (sample numbers)
       # -----------------------------
       - name: Run Tests
         run: |
           echo "Running tests..."
-
-          # Example dynamic logic (replace with real test parsing if needed)
-          TOTAL_TESTS=$(( RANDOM % 50 + 50 ))      # 50–99 tests
-          PASSED_TESTS=$(( RANDOM % TOTAL_TESTS )) # always <= total
-
+          TOTAL_TESTS=100
+          PASSED_TESTS=85
           echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_ENV
           echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_ENV
-
-          echo "Total Tests    : $TOTAL_TESTS"
-          echo "Passed Tests   : $PASSED_TESTS"
-          echo "Failed Tests   : $((TOTAL_TESTS - PASSED_TESTS))"
 
       # -----------------------------
       # CALCULATE PASS %
@@ -62,7 +55,7 @@ jobs:
           echo "finish=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
 
       # -----------------------------
-      # GENERATE A JUNIT XML FROM COUNTERS
+      # GENERATE A JUNIT XML FROM COUNTERS (so the action has input)
       # -----------------------------
       - name: Generate JUnit XML report from counters
         run: |
@@ -74,27 +67,93 @@ jobs:
           <?xml version="1.0" encoding="UTF-8"?>
           <testsuite name="CountersSuite" tests="${TOTAL_TESTS}" failures="${FAILED}" errors="0" skipped="${SKIPPED}" time="${DURATION}">
             <testcase classname="sample.Counter" name="passed_count" time="0.0"/>
-            <testcase classname="sample.Counter" name="failed_count" time="0.0"/>
+            <testcase classname="sample.Counter" name="failed_count" time="0.0">
+              <!-- Failure element will be ignored if FAILED=0; this is just a placeholder -->
+            </testcase>
           </testsuite>
           EOF
+          # Replace placeholders with actual env values
           sed -i "s/\${TOTAL_TESTS}/$TOTAL_TESTS/g" target/surefire-reports/junit-report.xml
           sed -i "s/\${FAILED}/$FAILED/g"         target/surefire-reports/junit-report.xml
           sed -i "s/\${SKIPPED}/$SKIPPED/g"       target/surefire-reports/junit-report.xml
           sed -i "s/\${DURATION}/$DURATION/g"     target/surefire-reports/junit-report.xml
+          echo "Wrote target/surefire-reports/junit-report.xml"
+          ls -l target/surefire-reports/
+
+      # -----------------------------
+      # SONARQUBE / SONARCLOUD SCAN
+      # -----------------------------
+      - name: SonarQube (SonarCloud) Scan
+        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=nidhishs91
+            -Dsonar.projectKey=nidhishs91_Normal_website
+            -Dsonar.sources=.
 
       # -----------------------------------------------------------
-      # SERVICENOW UNIT TEST RESULTS
+      # REGISTER UNIT TEST RESULTS IN SERVICENOW (OFFICIAL ACTION)
       # -----------------------------------------------------------
       - name: ServiceNow DevOps Unit Test Results
         uses: ServiceNow/servicenow-devops-test-report@v6.0.0
         with:
           devops-integration-user-name:  ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
           devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          instance-url:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
+          instance-url:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}   # e.g., https://coforgelimiteddemo14.service-now.com
           tool-id:  ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
           context-github:  ${{ toJSON(github) }}
-          job-name:  'Build, Test & Quality'
+          job-name:  'Build, Test & Quality'     # MUST match the job's display name exactly
           xml-report-filename:  target/surefire-reports/junit-report.xml
+
+      # -----------------------------------------------------------
+      # EXTRA SAFETY: POST THE SAME SUMMARY VIA TEST API WITH COMMIT
+      # -----------------------------------------------------------
+      - name: Publish Test Summary via Test API (ensures joins)
+        env:
+          SN_URL:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}          # https://<instance>.service-now.com
+          SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
+          SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
+          SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }} # or hardcode your tool sys_id
+        run: |
+          set -euo pipefail
+          API_URL="${SN_URL}/api/sn_devops/v1/devops/tool/test?toolId=95e3bb8693e37a10ea1eb3ad1dba10d3&testType=JUnit"
+
+          cat > body.json <<JSON
+          {
+            "name": "CountersSuite-${{ github.run_id }}",
+            "pipelineName": "${{ github.workflow }}",
+            "stageName": "Build, Test & Quality",
+            "repository": "${{ github.repository }}",
+            "branch": "${{ github.ref_name }}",
+            "commitId": "${{ github.sha }}",
+            "buildNumber": "${{ github.run_number }}",
+            "buildId": "${{ github.run_id }}",
+            "attemptNumber": "${{ github.run_attempt }}",
+            "startTime": "${{ steps.times.outputs.start }}",
+            "finishTime": "${{ steps.times.outputs.finish }}",
+            "totalTests": ${TOTAL_TESTS},
+            "passedTests": ${PASSED_TESTS},
+            "failedTests": $((TOTAL_TESTS - PASSED_TESTS)),
+            "skippedTests": 0,
+            "blockedTests": 0,
+            "duration": 0.0
+          }
+          JSON
+
+          echo "Calling ServiceNow Test API: $API_URL"
+          http_code=$(curl -sS -o sn_response.json -w "%{http_code}" \
+                      -X POST "$API_URL" \
+                      -H "Content-Type: application/json" \
+                      -u "$SN_USER:$SN_PASS" \
+                      --data @body.json)
+          echo "ServiceNow response ($http_code):"
+          cat sn_response.json || true
+          if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
+            echo "::error ::ServiceNow Test API failed with HTTP $http_code"
+            exit 1
+          fi
 
   # =====================================
   # SERVICENOW CHANGE + DEPLOY
@@ -131,3 +190,4 @@ jobs:
       - name: Deploy to Production
         run: |
           echo "Approval received. Running Prod deployment..."
+          # your deployment commands
