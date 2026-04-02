@@ -1,193 +1,108 @@
-name: Prod Deploy
+name: DevOps Normal Change with Code Coverage
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - nidsi_cae-patch-1
 
 permissions:
   contents: read
 
 jobs:
-  # =====================================
-  # BUILD + TEST + QUALITY
-  # =====================================
-  build:
-    runs-on: ubuntu-latest
-    name: Build, Test & Quality   # NOTE: use & (not &amp;)
-
-    steps:
-      # Checkout pinned to a SHA
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-        with:
-          fetch-depth: 0
-
-      - name: Build
-        run: |
-          echo "Build the project..."
-          # your build commands
-
-      # -----------------------------
-      # RUN TESTS (sample numbers)
-      # -----------------------------
-      - name: Run Tests
-        run: |
-          echo "Running tests..."
-          TOTAL_TESTS=100
-          PASSED_TESTS=85
-          echo "TOTAL_TESTS=$TOTAL_TESTS" >> $GITHUB_ENV
-          echo "PASSED_TESTS=$PASSED_TESTS" >> $GITHUB_ENV
-
-      # -----------------------------
-      # CALCULATE PASS %
-      # -----------------------------
-      - name: Calculate Test Pass Percentage
-        run: |
-          PASS_PERCENT=$(( PASSED_TESTS * 100 / TOTAL_TESTS ))
-          echo "PASS_PERCENT=$PASS_PERCENT" >> $GITHUB_ENV
-          echo "Test Pass Percentage: $PASS_PERCENT%"
-
-      # Capture timestamps for correlation
-      - name: Set timestamps
-        id: times
-        run: |
-          echo "start=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
-          echo "finish=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
-
-      # -----------------------------
-      # GENERATE A JUNIT XML FROM COUNTERS (so the action has input)
-      # -----------------------------
-      - name: Generate JUnit XML report from counters
-        run: |
-          mkdir -p target/surefire-reports
-          FAILED=$(( TOTAL_TESTS - PASSED_TESTS ))
-          SKIPPED=0
-          DURATION=0.0
-          cat > target/surefire-reports/junit-report.xml <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <testsuite name="CountersSuite" tests="${TOTAL_TESTS}" failures="${FAILED}" errors="0" skipped="${SKIPPED}" time="${DURATION}">
-            <testcase classname="sample.Counter" name="passed_count" time="0.0"/>
-            <testcase classname="sample.Counter" name="failed_count" time="0.0">
-              <!-- Failure element will be ignored if FAILED=0; this is just a placeholder -->
-            </testcase>
-          </testsuite>
-          EOF
-          # Replace placeholders with actual env values
-          sed -i "s/\${TOTAL_TESTS}/$TOTAL_TESTS/g" target/surefire-reports/junit-report.xml
-          sed -i "s/\${FAILED}/$FAILED/g"         target/surefire-reports/junit-report.xml
-          sed -i "s/\${SKIPPED}/$SKIPPED/g"       target/surefire-reports/junit-report.xml
-          sed -i "s/\${DURATION}/$DURATION/g"     target/surefire-reports/junit-report.xml
-          echo "Wrote target/surefire-reports/junit-report.xml"
-          ls -l target/surefire-reports/
-
-      # -----------------------------
-      # SONARQUBE / SONARCLOUD SCAN
-      # -----------------------------
-      - name: SonarQube (SonarCloud) Scan
-        uses: SonarSource/sonarqube-scan-action@a31c9398be7ace6bbfaf30c0bd5d415f843d45e9
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.organization=nidhishs91
-            -Dsonar.projectKey=nidhishs91_Normal_website
-            -Dsonar.sources=.
-
-      # -----------------------------------------------------------
-      # REGISTER UNIT TEST RESULTS IN SERVICENOW (OFFICIAL ACTION)
-      # -----------------------------------------------------------
-      - name: ServiceNow DevOps Unit Test Results
-        uses: ServiceNow/servicenow-devops-test-report@v6.0.0
-        with:
-          devops-integration-user-name:  ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
-          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          instance-url:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}   # e.g., https://coforgelimiteddemo14.service-now.com
-          tool-id:  ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
-          context-github:  ${{ toJSON(github) }}
-          job-name:  'Build, Test & Quality'     # MUST match the job's display name exactly
-          xml-report-filename:  target/surefire-reports/junit-report.xml
-
-      # -----------------------------------------------------------
-      # EXTRA SAFETY: POST THE SAME SUMMARY VIA TEST API WITH COMMIT
-      # -----------------------------------------------------------
-      - name: Publish Test Summary via Test API (ensures joins)
-        env:
-          SN_URL:  ${{ secrets.SN_INSTANCE_URL_DEMO14 }}          # https://<instance>.service-now.com
-          SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
-          SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          SN_TOOL: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }} # or hardcode your tool sys_id
-        run: |
-          set -euo pipefail
-          API_URL="${SN_URL}/api/sn_devops/v1/devops/tool/test?toolId=95e3bb8693e37a10ea1eb3ad1dba10d3&testType=JUnit"
-
-          cat > body.json <<JSON
-          {
-            "name": "CountersSuite-${{ github.run_id }}",
-            "pipelineName": "${{ github.workflow }}",
-            "stageName": "Build, Test & Quality",
-            "repository": "${{ github.repository }}",
-            "branch": "${{ github.ref_name }}",
-            "commitId": "${{ github.sha }}",
-            "buildNumber": "${{ github.run_number }}",
-            "buildId": "${{ github.run_id }}",
-            "attemptNumber": "${{ github.run_attempt }}",
-            "startTime": "${{ steps.times.outputs.start }}",
-            "finishTime": "${{ steps.times.outputs.finish }}",
-            "totalTests": ${TOTAL_TESTS},
-            "passedTests": ${PASSED_TESTS},
-            "failedTests": $((TOTAL_TESTS - PASSED_TESTS)),
-            "skippedTests": 0,
-            "blockedTests": 0,
-            "duration": 0.0
-          }
-          JSON
-
-          echo "Calling ServiceNow Test API: $API_URL"
-          http_code=$(curl -sS -o sn_response.json -w "%{http_code}" \
-                      -X POST "$API_URL" \
-                      -H "Content-Type: application/json" \
-                      -u "$SN_USER:$SN_PASS" \
-                      --data @body.json)
-          echo "ServiceNow response ($http_code):"
-          cat sn_response.json || true
-          if [ "$http_code" != "200" ] && [ "$http_code" != "201" ]; then
-            echo "::error ::ServiceNow Test API failed with HTTP $http_code"
-            exit 1
-          fi
-
-  # =====================================
-  # SERVICENOW CHANGE + DEPLOY
-  # =====================================
   ServiceNowDevOpsChange:
-    needs: build
     runs-on: ubuntu-latest
     name: ServiceNow DevOps Change (Prod Deploy)
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+    # -----------------------------------
+    # CHECKOUT
+    # -----------------------------------
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Create ServiceNow DevOps Change and wait for approval
-        uses: ServiceNow/servicenow-devops-change@v6.1.0
-        with:
-          devops-integration-user-name:     ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
-          devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
-          instance-url: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
-          tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID_DEMO14 }}
-          context-github: ${{ toJSON(github) }}
-          job-name: 'ServiceNow DevOps Change (Prod Deploy)'
-          change-request: >-
-            {
-              "autoCloseChange":"true",
-              "attributes":{
-                "short_description":"Prod deploy",
-                "description":"Automated deployment via GitHub Actions. Test results and quality metrics published."
-              }
+    # -----------------------------------
+    # RUN TESTS (Demo values)
+    # -----------------------------------
+    - name: Run Tests
+      run: |
+        echo "Running tests..."
+        TOTAL_TESTS=100
+        PASSED_TESTS=85
+
+    # -----------------------------------
+    # GENERATE CODE COVERAGE (LCOV)
+    # -----------------------------------
+    - name: Generate Code Coverage Report
+      run: |
+        mkdir -p coverage
+
+        cat > coverage/lcov.info << EOF
+        TN:
+        SF:src/main/java/com/sample/App.java
+        DA:1,1
+        DA:2,1
+        DA:3,1
+        DA:4,1
+        DA:5,1
+        LF:5
+        LH:4
+        end_of_record
+        EOF
+
+        echo "Generated demo code coverage report"
+
+    # -----------------------------------
+    # SEND CODE COVERAGE TO SERVICENOW
+    # -----------------------------------
+    - name: ServiceNow DevOps Code Coverage
+      uses: ServiceNow/servicenow-devops-sonar-report@v5.0.0
+      with:
+        devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+        devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+        instance-url: ${{ secrets.SN_INSTANCE_URL }}
+        tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+        context-github: ${{ toJSON(github) }}
+        coverage-report-path: coverage/lcov.info
+        job-name: "ServiceNow DevOps Change (Prod Deploy)"
+
+    # -----------------------------------
+    # CREATE DEVOPS NORMAL CHANGE
+    # -----------------------------------
+    - name: Create ServiceNow Normal Change
+      id: CreateChange
+      uses: ServiceNow/servicenow-devops-change@v6.1.0
+      with:
+        devops-integration-user-name: ${{ secrets.SN_DEVOPS_USER }}
+        devops-integration-user-password: ${{ secrets.SN_DEVOPS_PASSWORD }}
+        instance-url: ${{ secrets.SN_INSTANCE_URL }}
+        tool-id: ${{ secrets.SN_ORCHESTRATION_TOOL_ID }}
+        context-github: ${{ toJSON(github) }}
+        job-name: "ServiceNow DevOps Change (Prod Deploy)"
+        interval: "15"
+        timeout: "900"
+        change-request: >
+          {
+            "autoCloseChange": "true",
+            "attributes": {
+              "short_description": "DevOps Normal Change GH",
+              "description": "Production change\nTests successful\nCode coverage captured",
+              "service_offering": "fe2c2286a8e3e210e2ca594979e38503",
+              "requested_by": "a0e11bb23ba32300b200655593efc491"
             }
-          interval: '30'
-          timeout: '3600'
+          }
 
-      - name: Deploy to Production
-        run: |
-          echo "Approval received. Running Prod deployment..."
-          # your deployment commands
+    # -----------------------------------
+    # ADD WORK NOTES
+    # -----------------------------------
+    - name: Add Work Notes
+      run: |
+        SYS_ID="${{ steps.CreateChange.outputs.change-request-sys-id }}"
+        echo "Change sys_id = $SYS_ID"
+
+        curl -X PUT \
+        "${{ secrets.SN_INSTANCE_URL }}/api/now/table/change_request/${SYS_ID}" \
+        --user "${{ secrets.SN_DEVOPS_USER }}:${{ secrets.SN_DEVOPS_PASSWORD }}" \
+        --header "Content-Type: application/json" \
+        --data '{
+          "work_notes": "GitHub Pipeline completed with Code Coverage. Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        }'
