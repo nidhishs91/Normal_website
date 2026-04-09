@@ -3,7 +3,7 @@ name: DevOps Normal Change with Code Coverage
 on:
   push:
     branches:
-      - nidsi_cae-patch-1
+      - main
 
 permissions:
   contents: read
