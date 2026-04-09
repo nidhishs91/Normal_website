@@ -147,7 +147,6 @@ jobs:
         timeout: "900"
         change-request: >
           {
-            "autoCloseChange": "true",
             "attributes": {
               "short_description": "DevOps Normal Change GH",
               "description": "Production change\nTests successful",
@@ -168,6 +167,6 @@ jobs:
         "${{ secrets.SN_INSTANCE_URL }}/api/now/table/change_request/${SYS_ID}" \
         --user "${{ secrets.SN_DEVOPS_USER }}:${{ secrets.SN_DEVOPS_PASSWORD }}" \
         --header "Content-Type: application/json" \
-        --data '{
-          "work_notes": "GitHub Pipeline completed successfully. Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        }'
+        --data "{
+          \"work_notes\": \"GitHub Pipeline completed successfully. Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}\"
+        }"
