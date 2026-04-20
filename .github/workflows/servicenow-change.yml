@@ -386,9 +386,7 @@ on:
 permissions:
   contents: read
   security-events: read
-  secrets: read
-  dependency-graph: read
-
+  
 jobs:
   ServiceNowDevOpsChange:
     runs-on: ubuntu-latest
