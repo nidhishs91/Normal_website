@@ -7,7 +7,10 @@
 // }, 1000);
 function showTime() {
   const userInput = window.location.hash.substring(1);
-  document.getElementById("currentTime").innerHTML = userInput;
+  if (userInput) {
+    document.getElementById("currentTime").innerHTML = userInput;
+  }
 }
 
 showTime();
+console.log("Vulnerable script loaded - CodeQL should detect DOM XSS");
