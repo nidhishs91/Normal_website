@@ -38,10 +38,7 @@ jobs:
             "attributes": {
               "short_description": "DevOps Normal Change GH",
               "description": "Production change\nTests successful",
-              "requested_by": "a0e11bb23ba32300b200655593efc491",
-              "chg_model":{
-              "name":"DevOps Simplified"
-              }
+              "requested_by": "a0e11bb23ba32300b200655593efc491"
             }
           }
 
