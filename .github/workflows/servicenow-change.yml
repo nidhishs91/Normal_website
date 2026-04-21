@@ -382,11 +382,11 @@ on:
       - main
   workflow_dispatch:
 
-# ✅ FINAL REQUIRED PERMISSIONS
+# ✅ Only valid permissions (do NOT add dependabot / secret-scanning here)
 permissions:
   contents: read
   security-events: read
-  
+
 jobs:
   ServiceNowDevOpsChange:
     runs-on: ubuntu-latest
@@ -429,7 +429,13 @@ jobs:
             print(e)
 
         with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-            f.write(f"total={total}\npassed={passed}\nfailed={failed}\nskipped={skipped}\nduration={duration}\n")
+            f.write(
+                f"total={total}\n"
+                f"passed={passed}\n"
+                f"failed={failed}\n"
+                f"skipped={skipped}\n"
+                f"duration={duration}\n"
+            )
         PY
 
     # -----------------------------------
@@ -474,17 +480,20 @@ jobs:
         timeout: "900"
 
     # -----------------------------------
-    # ✅ GHAS: CODE + SECRET + DEPENDABOT
+    # ✅ GHAS: CODE + SECRET + DEPENDABOT (USING PAT)
     # -----------------------------------
     - name: Export GHAS report to ServiceNow Work Notes
       if: always() && steps.CreateChange.outputs['change-request-sys-id'] != ''
       shell: bash
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # ✅ IMPORTANT: use PAT, NOT GITHUB_TOKEN
+        GH_TOKEN: ${{ secrets.GHAS_PAT }}
+
         SN_URL: ${{ secrets.SN_INSTANCE_URL_DEMO14 }}
         SN_USER: ${{ secrets.SN_DEVOPS_USER_DEMO14 }}
         SN_PASS: ${{ secrets.SN_DEVOPS_PASSWORD_DEMO14 }}
         CHANGE_SYS_ID: ${{ steps.CreateChange.outputs['change-request-sys-id'] }}
+
         REPO: ${{ github.repository }}
         RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       run: |
@@ -521,13 +530,16 @@ jobs:
             f"Code scanning alerts: {len(code)}",
             f"Secret scanning alerts: {len(secrets)}",
             f"Dependabot alerts: {len(deps)}",
+            ""
         ]
 
         for a in code:
             lines.append(f"[CODE] {a.get('severity','').upper()} - {a.get('html_url')}")
 
         for a in secrets:
-            lines.append(f"[SECRET] {a.get('secret_type_display_name')} - {a.get('html_url')}")
+            lines.append(
+                f"[SECRET] {a.get('secret_type_display_name')} - {a.get('html_url')}"
+            )
 
         for a in deps:
             pkg = a.get("dependency",{}).get("package",{}).get("name")
@@ -547,5 +559,6 @@ jobs:
             }
         )
         urllib.request.urlopen(req)
+
         print("\n".join(lines))
         PY
