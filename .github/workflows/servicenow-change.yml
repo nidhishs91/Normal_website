@@ -662,7 +662,9 @@ jobs:
               "attributes": {
                 "short_description": "DevOps Normal Change - GitHub",
                 "description": "Deployment with automated test & security validation",
-                "chg_model": { "name": "DevOps Simplified" }
+                "chg_model": {
+                  "name": "DevOps Simplified"
+                }
               }
             }
           interval: "15"
