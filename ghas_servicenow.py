@@ -19,7 +19,7 @@ change_sys_id = os.environ["CHANGE_SYS_ID"]
 run_id = os.environ["RUN_ID"]
 run_url = os.environ["RUN_URL"]
 
-# Optional: if you want to populate reference field
+# Optional: if you want to populate the reference field
 app_release_sys_id = os.environ.get("APP_RELEASE_SYS_ID", "").strip()
 
 # Optional: override table name if needed
@@ -60,10 +60,11 @@ def gh_request(url):
         raise RuntimeError(f"GitHub request failed for {url}: {e}")
 
 
-def fetch_alerts(endpoint):
+def fetch_alerts(endpoint, state="open"):
     """
-    Fetch all alerts with pagination.
-    Uses state=all so you don't miss resolved/closed alerts.
+    Fetch alerts with pagination.
+    Secret scanning supports only 'open' or 'resolved'.
+    We use 'open' here for consistency and safety.
     """
     alerts = []
     page = 1
@@ -71,7 +72,7 @@ def fetch_alerts(endpoint):
     while True:
         url = (
             f"https://api.github.com/repos/{repo}/{endpoint}"
-            f"?state=all&per_page=100&page={page}"
+            f"?state={state}&per_page=100&page={page}"
         )
         batch = gh_request(url)
 
@@ -114,24 +115,12 @@ def build_rating(total_count):
     return "Critical"
 
 
-def severity_rank(sev):
-    sev = (sev or "").lower()
-    order = {
-        "low": 1,
-        "moderate": 2,
-        "medium": 2,
-        "high": 3,
-        "critical": 4,
-    }
-    return order.get(sev, 0)
-
-
 # ----------------------------------------------------
 # FETCH GHAS ALERTS
 # ----------------------------------------------------
-code_alerts = fetch_alerts("code-scanning/alerts")
-secret_alerts = fetch_alerts("secret-scanning/alerts")
-dependabot_alerts = fetch_alerts("dependabot/alerts")
+code_alerts = fetch_alerts("code-scanning/alerts", state="open")
+secret_alerts = fetch_alerts("secret-scanning/alerts", state="open")
+dependabot_alerts = fetch_alerts("dependabot/alerts", state="open")
 
 code_count = len(code_alerts)
 secret_count = len(secret_alerts)
@@ -202,7 +191,7 @@ print(f"Updated ServiceNow change request: {change_sys_id}")
 # ----------------------------------------------------
 # UPSERT SERVICENOW SCAN SUMMARY
 # ----------------------------------------------------
-# Field names from your table:
+# Table field names from your screenshot/dictionary:
 # source
 # application_release
 # scan_summary_name
