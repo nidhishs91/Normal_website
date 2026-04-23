@@ -22,6 +22,7 @@ run_url = os.environ["RUN_URL"]
 # Optional
 app_release_sys_id = os.environ.get("APP_RELEASE_SYS_ID", "").strip()
 summary_table = os.environ.get("SN_SUMMARY_TABLE", "sn_vul_app_vul_scan_summary").strip()
+ghas_source_label = os.environ.get("GHAS_SOURCE_LABEL", "GitHub Advanced Security").strip()
 
 # ----------------------------------------------------
 # HEADERS
@@ -46,7 +47,8 @@ def gh_request(url):
     req = urllib.request.Request(url, headers=gh_headers)
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+            body = resp.read().decode("utf-8")
+            return json.loads(body)
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="ignore")
         raise RuntimeError(f"GitHub API error {e.code}: {err}")
@@ -112,12 +114,18 @@ def build_rating(total):
         return "High"
     return "Critical"
 
+
+def print_json(title, data):
+    print(title)
+    print(json.dumps(data, indent=2))
+
+
 # ----------------------------------------------------
-# FETCH GHAS ALERTS ✅
+# FETCH GHAS ALERTS
 # ----------------------------------------------------
 code_alerts = fetch_alerts("code-scanning/alerts", paginate=True)
 secret_alerts = fetch_alerts("secret-scanning/alerts", paginate=True)
-dependabot_alerts = fetch_alerts("dependabot/alerts", paginate=False)  # ✅ FIX
+dependabot_alerts = fetch_alerts("dependabot/alerts", paginate=False)
 
 code_count = len(code_alerts)
 secret_count = len(secret_alerts)
@@ -146,7 +154,9 @@ if code_alerts:
     lines.append("Code Scanning:")
     for a in code_alerts:
         rule = a.get("rule", {})
-        lines.append(f"- [{rule.get('severity', 'info').upper()}] {rule.get('description', '')}")
+        severity = rule.get("severity", "info").upper()
+        desc = rule.get("description", "")
+        lines.append(f"- [{severity}] {desc}")
         lines.append(f"  {a.get('html_url', '')}")
 
 if secret_alerts:
@@ -184,30 +194,53 @@ sn_request(
 print(f"✅ Updated change request {change_sys_id}")
 
 # ----------------------------------------------------
-# UPSERT SCAN SUMMARY
+# BUILD SCAN SUMMARY PAYLOAD
 # ----------------------------------------------------
 summary_payload = {
-    "source": "GitHub Advanced Security",
+    "source": ghas_source_label,
     "scan_summary_name": f"GHAS - {repo} - Run {run_id}",
     "source_scan_id": str(run_id),
     "last_scan_date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-    "detected_flaw_count": str(total_count),
+    "detected_flaw_count": total_count,   # IMPORTANT: integer, not string
     "last_scan_rating": rating,
 }
 
 if app_release_sys_id:
     summary_payload["application_release"] = app_release_sys_id
 
+print_json("✅ Summary payload being sent:", summary_payload)
+
+# ----------------------------------------------------
+# UPSERT SCAN SUMMARY
+# ----------------------------------------------------
 query = urllib.parse.quote(f"source_scan_id={run_id}", safe="=")
-search_url = f"{sn_url}/api/now/table/{summary_table}?sysparm_query={query}&sysparm_limit=1"
+search_url = (
+    f"{sn_url}/api/now/table/{summary_table}"
+    f"?sysparm_query={query}&sysparm_limit=1"
+)
+
 existing = sn_request("GET", search_url).get("result", [])
 
 if existing:
     sys_id = existing[0]["sys_id"]
     sn_request("PATCH", f"{sn_url}/api/now/table/{summary_table}/{sys_id}", summary_payload)
     print(f"✅ Updated scan summary {sys_id}")
+    saved_sys_id = sys_id
 else:
     created = sn_request("POST", f"{sn_url}/api/now/table/{summary_table}", summary_payload)
-    print(f"✅ Created scan summary {created.get('result', {}).get('sys_id')}")
+    saved_sys_id = created.get("result", {}).get("sys_id")
+    print(f"✅ Created scan summary {saved_sys_id}")
+
+# ----------------------------------------------------
+# VERIFY SAVED RECORD
+# ----------------------------------------------------
+if saved_sys_id:
+    verify_url = (
+        f"{sn_url}/api/now/table/{summary_table}/{saved_sys_id}"
+        "?sysparm_fields=source,scan_summary_name,source_scan_id,last_scan_date,"
+        "detected_flaw_count,last_scan_rating,application_release"
+    )
+    saved_record = sn_request("GET", verify_url)
+    print_json("✅ Saved ServiceNow record:", saved_record)
 
 print("✅ GHAS → ServiceNow sync completed successfully.")
