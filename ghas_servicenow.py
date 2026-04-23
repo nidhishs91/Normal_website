@@ -21,7 +21,7 @@ run_url = os.environ["RUN_URL"]
 
 # Optional
 app_release_sys_id = os.environ.get("APP_RELEASE_SYS_ID", "").strip()
-summary_table = os.environ.get("SN_SUMMARY_TABLE", "sn_vul_app_vul_scan_summary").strip()
+summary_table = os.environ.get("SN_SUMMARY_TABLE", "sn_vul_app_scan").strip()
 
 # ----------------------------------------------------
 # HEADERS
